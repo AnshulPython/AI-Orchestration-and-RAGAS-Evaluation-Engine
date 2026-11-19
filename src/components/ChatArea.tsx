@@ -44,8 +44,10 @@ import {
   Maximize2,
   Sun,
   Moon,
+  Laptop,
   Github,
   Calendar,
+  Clock,
 } from 'lucide-react';
 import {
   AIModel,
@@ -163,13 +165,41 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   const [expandedThinking, setExpandedThinking] = useState<Record<string, boolean>>({});
   const [showToolsBar, setShowToolsBar] = useState(false);
+  const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
+  const [isDateMenuOpen, setIsDateMenuOpen] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
+  const themeMenuRef = useRef<HTMLDivElement>(null);
+  const dateMenuRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef<boolean>(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const getLocalTodayIso = (offsetDays = 0) => {
+    const d = new Date();
+    if (offsetDays !== 0) {
+      d.setDate(d.getDate() + offsetDays);
+    }
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  const formatDateHuman = (isoDate: string) => {
+    try {
+      const parsed = new Date(`${isoDate}T12:00:00Z`);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toLocaleDateString('en-US', {
+          weekday: 'short',
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          timeZone: 'UTC',
+        });
+      }
+    } catch {}
+    return isoDate;
+  };
 
   const currentProviderInfo =
     AI_PROVIDERS.find((p) => p.id === activeProvider) || AI_PROVIDERS[0];
@@ -181,18 +211,25 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     isNearBottomRef.current = scrollHeight - scrollTop - clientHeight < 150;
   };
 
-  // Close more menu on click outside
+  // Close header menus on click outside
   useEffect(() => {
     const handleOutside = (e: MouseEvent) => {
-      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (moreMenuRef.current && !moreMenuRef.current.contains(target)) {
         setIsMoreMenuOpen(false);
       }
+      if (themeMenuRef.current && !themeMenuRef.current.contains(target)) {
+        setIsThemeMenuOpen(false);
+      }
+      if (dateMenuRef.current && !dateMenuRef.current.contains(target)) {
+        setIsDateMenuOpen(false);
+      }
     };
-    if (isMoreMenuOpen) {
+    if (isMoreMenuOpen || isThemeMenuOpen || isDateMenuOpen) {
       document.addEventListener('mousedown', handleOutside);
       return () => document.removeEventListener('mousedown', handleOutside);
     }
-  }, [isMoreMenuOpen]);
+  }, [isMoreMenuOpen, isThemeMenuOpen, isDateMenuOpen]);
 
   // Subscribe to speech synthesis state updates
   useEffect(() => {
@@ -389,7 +426,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       )}
 
       {/* Minimalist Top Header */}
-      <header className="h-13 border-b border-[#2d2f31]/60 bg-[#131314]/90 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between z-10 shrink-0">
+      <header className="h-13 border-b border-[#2d2f31]/60 bg-[#131314]/90 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between z-30 shrink-0">
         <div className="flex items-center gap-1.5 min-w-0">
           <button
             onClick={onToggleSidebar}
@@ -553,21 +590,75 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             )}
           </div>
 
-          {/* Quick Theme Toggle (Light / Dark Mode) */}
-          {onToggleTheme && (
-            <button
-              type="button"
-              onClick={onToggleTheme}
-              className="flex items-center justify-center w-8 h-8 rounded-full bg-[#1e1f20] hover:bg-[#282a2c] text-[#e3e3e3] border border-[#2d2f31] transition-all cursor-pointer touch-manipulation active:scale-95 shrink-0"
-              title={`Switch to ${actualTheme === 'dark' ? 'Light' : 'Dark'} mode`}
-              aria-label="Toggle light or dark theme"
-            >
-              {actualTheme === 'dark' ? (
-                <Sun className="w-4 h-4 text-[#f9ab00] transition-transform hover:rotate-45" />
-              ) : (
-                <Moon className="w-4 h-4 text-[#1a73e8] transition-transform hover:-rotate-12" />
+          {/* Theme Selector (Light / Dark / System) */}
+          {(onThemeChange || onToggleTheme) && (
+            <div className="relative shrink-0" ref={themeMenuRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onThemeChange) {
+                    setIsDateMenuOpen(false);
+                    setIsMoreMenuOpen(false);
+                    setIsThemeMenuOpen((prev) => !prev);
+                  } else {
+                    onToggleTheme?.();
+                  }
+                }}
+                className="flex items-center gap-1.5 px-2.5 h-8 rounded-full bg-[#1e1f20] hover:bg-[#282a2c] text-[#e3e3e3] border border-[#2d2f31] transition-all cursor-pointer touch-manipulation active:scale-95 shrink-0"
+                title={`Theme: ${theme === 'system' ? `System (${actualTheme})` : theme}. Click to change.`}
+                aria-label="Change theme"
+              >
+                {theme === 'system' ? (
+                  <Laptop className="w-3.5 h-3.5 text-[#8ab4f8]" />
+                ) : actualTheme === 'dark' ? (
+                  <Moon className="w-3.5 h-3.5 text-[#8ab4f8]" />
+                ) : (
+                  <Sun className="w-3.5 h-3.5 text-[#f9ab00]" />
+                )}
+                <span className="hidden lg:inline text-[11px] font-medium capitalize">
+                  {theme}
+                </span>
+              </button>
+
+              {isThemeMenuOpen && onThemeChange && (
+                <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-[#1e1f20] border border-[#2d2f31] shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#8e918f]">
+                    Appearance
+                  </div>
+                  {(
+                    [
+                      { id: 'light' as ThemeMode, label: 'Light Mode', icon: Sun, iconClass: 'text-[#f9ab00]' },
+                      { id: 'dark' as ThemeMode, label: 'Dark Mode', icon: Moon, iconClass: 'text-[#8ab4f8]' },
+                      { id: 'system' as ThemeMode, label: 'System Default', icon: Laptop, iconClass: 'text-[#c58af9]' },
+                    ] as const
+                  ).map((opt) => {
+                    const IconComp = opt.icon;
+                    const active = theme === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => {
+                          onThemeChange(opt.id);
+                          setIsThemeMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs transition-colors cursor-pointer ${
+                          active
+                            ? 'bg-[#282a2c] text-[#8ab4f8] font-medium'
+                            : 'text-[#c4c7c5] hover:bg-[#282a2c]/70 hover:text-white'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <IconComp className={`w-3.5 h-3.5 ${opt.iconClass}`} />
+                          <span>{opt.label}</span>
+                        </span>
+                        {active && <Check className="w-3.5 h-3.5 text-[#8ab4f8]" />}
+                      </button>
+                    );
+                  })}
+                </div>
               )}
-            </button>
+            </div>
           )}
 
           {/* API Keys Configuration Button */}
@@ -580,27 +671,190 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <span className="hidden sm:inline">API Keys</span>
           </button>
 
-          {/* System Date Anchor Indicator */}
-          <button
-            onClick={onOpenSettingsModal}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border transition-colors ml-0.5 cursor-pointer touch-manipulation active:scale-95 shrink-0 ${
-              capabilities.systemDateMode === 'custom'
-                ? 'bg-[#8ab4f8]/10 text-[#8ab4f8] border-[#8ab4f8]/40 hover:bg-[#8ab4f8]/20'
-                : 'bg-[#1e1f20] hover:bg-[#282a2c] text-[#8e918f] hover:text-[#e3e3e3] border-[#2d2f31]'
-            }`}
-            title={`System Date seen by LLM: ${
-              capabilities.systemDateMode === 'custom'
-                ? capabilities.customSystemDate || 'Custom'
-                : 'Live Device Date'
-            }. Click to choose or change date.`}
-          >
-            <Calendar className="w-3.5 h-3.5 text-[#8ab4f8]" />
-            <span className="hidden sm:inline text-[11px] font-mono">
-              {capabilities.systemDateMode === 'custom'
-                ? capabilities.customSystemDate || 'Custom Date'
-                : 'Date: Live'}
-            </span>
-          </button>
+          {/* System Date Anchor Selector Popover */}
+          <div className="relative shrink-0" ref={dateMenuRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setIsThemeMenuOpen(false);
+                setIsMoreMenuOpen(false);
+                setIsDateMenuOpen((prev) => !prev);
+              }}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border transition-colors ml-0.5 cursor-pointer touch-manipulation active:scale-95 shrink-0 ${
+                capabilities.systemDateMode === 'custom'
+                  ? 'bg-[#8ab4f8]/15 text-[#8ab4f8] border-[#8ab4f8]/40 hover:bg-[#8ab4f8]/25'
+                  : 'bg-[#1e1f20] hover:bg-[#282a2c] text-[#c4c7c5] hover:text-[#e3e3e3] border-[#2d2f31]'
+              }`}
+              title={`System Date seen by LLM: ${
+                capabilities.systemDateMode === 'custom'
+                  ? capabilities.customSystemDate || getLocalTodayIso()
+                  : `Live (${getLocalTodayIso()})`
+              }. Click to choose or change date.`}
+            >
+              <Calendar className="w-3.5 h-3.5 text-[#8ab4f8]" />
+              <span className="hidden sm:inline text-[11px] font-mono">
+                {capabilities.systemDateMode === 'custom'
+                  ? capabilities.customSystemDate || getLocalTodayIso()
+                  : 'Date: Live'}
+              </span>
+            </button>
+
+            {isDateMenuOpen && (
+              <div className="absolute right-0 mt-2 w-72 sm:w-80 rounded-2xl bg-[#1e1f20] border border-[#2d2f31] shadow-2xl p-3.5 z-50 space-y-3 animate-in fade-in zoom-in-95 duration-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-[#e3e3e3]">
+                    <Calendar className="w-3.5 h-3.5 text-[#8ab4f8]" />
+                    <span>LLM System Date</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsDateMenuOpen(false)}
+                    className="p-1 rounded-lg text-[#8e918f] hover:text-[#e3e3e3] hover:bg-[#282a2c] cursor-pointer"
+                    aria-label="Close date selector"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Live vs Custom Mode Switch */}
+                <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-[#131314] border border-[#2d2f31]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const today = getLocalTodayIso();
+                      onChangeCapabilities({
+                        ...capabilities,
+                        systemDateMode: 'current',
+                        systemDate: today,
+                      });
+                    }}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                      capabilities.systemDateMode !== 'custom'
+                        ? 'bg-[#8ab4f8] text-[#131314] shadow-xs'
+                        : 'text-[#8e918f] hover:text-[#e3e3e3]'
+                    }`}
+                  >
+                    Live Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const dateVal = capabilities.customSystemDate || getLocalTodayIso();
+                      onChangeCapabilities({
+                        ...capabilities,
+                        systemDateMode: 'custom',
+                        customSystemDate: dateVal,
+                        systemDate: dateVal,
+                      });
+                    }}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                      capabilities.systemDateMode === 'custom'
+                        ? 'bg-[#8ab4f8] text-[#131314] shadow-xs'
+                        : 'text-[#8e918f] hover:text-[#e3e3e3]'
+                    }`}
+                  >
+                    Custom Date
+                  </button>
+                </div>
+
+                {/* Date Picker Input (always interactive — picking a date switches to custom) */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-medium text-[#c4c7c5] flex items-center gap-1.5">
+                    <Clock className="w-3 h-3 text-[#8ab4f8]" />
+                    <span>Choose Date Seen by Model</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={
+                      capabilities.systemDateMode === 'custom'
+                        ? capabilities.customSystemDate || getLocalTodayIso()
+                        : getLocalTodayIso()
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val) {
+                        onChangeCapabilities({
+                          ...capabilities,
+                          systemDateMode: 'custom',
+                          customSystemDate: val,
+                          systemDate: val,
+                        });
+                      }
+                    }}
+                    className="w-full px-3 py-2 rounded-xl bg-[#131314] border border-[#2d2f31] text-xs text-[#e3e3e3] font-mono focus:border-[#8ab4f8] focus:outline-none cursor-pointer"
+                  />
+                </div>
+
+                {/* Quick Presets */}
+                <div className="space-y-1.5">
+                  <div className="text-[10px] text-[#8e918f] uppercase tracking-wider">
+                    Quick Presets
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { label: 'Today (Live)', mode: 'current' as const, val: getLocalTodayIso(0) },
+                      { label: 'Yesterday', mode: 'custom' as const, val: getLocalTodayIso(-1) },
+                      { label: '1 Year Ago', mode: 'custom' as const, val: getLocalTodayIso(-365) },
+                      { label: '2025-01-01', mode: 'custom' as const, val: '2025-01-01' },
+                      { label: '2024-01-01', mode: 'custom' as const, val: '2024-01-01' },
+                      { label: '2020-01-01', mode: 'custom' as const, val: '2020-01-01' },
+                      { label: '2030-01-01', mode: 'custom' as const, val: '2030-01-01' },
+                    ].map((preset) => {
+                      const isActive =
+                        preset.mode === 'current'
+                          ? capabilities.systemDateMode !== 'custom'
+                          : capabilities.systemDateMode === 'custom' &&
+                            capabilities.customSystemDate === preset.val;
+                      return (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => {
+                            if (preset.mode === 'current') {
+                              onChangeCapabilities({
+                                ...capabilities,
+                                systemDateMode: 'current',
+                                systemDate: preset.val,
+                              });
+                            } else {
+                              onChangeCapabilities({
+                                ...capabilities,
+                                systemDateMode: 'custom',
+                                customSystemDate: preset.val,
+                                systemDate: preset.val,
+                              });
+                            }
+                          }}
+                          className={`px-2 py-1 rounded-lg text-[11px] font-mono transition-colors cursor-pointer ${
+                            isActive
+                              ? 'bg-[#8ab4f8] text-[#131314] font-medium'
+                              : 'bg-[#131314] hover:bg-[#282a2c] text-[#8e918f] hover:text-[#e3e3e3] border border-[#2d2f31]'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Live Prompt Preview */}
+                <div className="p-2.5 rounded-xl bg-[#131314] border border-[#2d2f31] text-[11px] text-[#9aa0a6] leading-relaxed">
+                  <span className="text-[#8ab4f8] font-semibold">LLM sees: </span>
+                  {formatDateHuman(
+                    capabilities.systemDateMode === 'custom'
+                      ? capabilities.customSystemDate || getLocalTodayIso()
+                      : getLocalTodayIso()
+                  )}{' '}
+                  (
+                  {capabilities.systemDateMode === 'custom'
+                    ? capabilities.customSystemDate || getLocalTodayIso()
+                    : getLocalTodayIso()}
+                  )
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* GitHub Repository Link Button */}
           <a
@@ -880,7 +1134,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                                     <span>Switch Provider</span>
                                   </div>
                                   <div className="text-[11px] text-[#8e918f] mt-0.5">
-                                    Try Groq, Anthropic Claude, or OpenAI
+                                    Try Local WebGPU/Ollama, Groq, Claude, or OpenAI
                                   </div>
                                 </div>
                                 <ArrowRight className="w-4 h-4 text-[#c4c7c5] opacity-70 group-hover:translate-x-0.5 transition-transform shrink-0" />
@@ -911,6 +1165,30 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         )
                       ) : (
                         <div>
+                          {message.localLoadProgress && (
+                            <div className="mb-3 p-3.5 rounded-xl bg-[#1e1f20] border border-[#81c995]/40 space-y-2 max-w-lg">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="font-medium text-[#81c995] flex items-center gap-1.5">
+                                  <Cpu className="w-3.5 h-3.5 animate-pulse" />
+                                  <span>Loading Local Model ({message.modelUsed || 'WebGPU'})</span>
+                                </span>
+                                <span className="font-mono text-[#e3e3e3]">
+                                  {Math.round((message.localLoadProgress.progress || 0) * 100)}%
+                                </span>
+                              </div>
+                              <div className="w-full h-1.5 rounded-full bg-[#131314] overflow-hidden">
+                                <div
+                                  className="h-full bg-[#81c995] transition-all duration-200"
+                                  style={{
+                                    width: `${Math.max(4, Math.round((message.localLoadProgress.progress || 0) * 100))}%`,
+                                  }}
+                                />
+                              </div>
+                              <div className="text-[11px] text-[#8e918f] truncate">
+                                {message.localLoadProgress.text}
+                              </div>
+                            </div>
+                          )}
                           {message.content && <MarkdownRenderer content={message.content} />}
 
                           {/* Render AI Generated Image Card */}
@@ -1136,6 +1414,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 onOpenSecretPromptModal={onOpenSecretPromptModal}
                 onOpenRagasModal={onOpenRagasModal}
                 onOpenVoiceModal={() => setIsVoicePopoverOpen(true)}
+                onOpenDatePicker={() => {
+                  setIsThemeMenuOpen(false);
+                  setIsMoreMenuOpen(false);
+                  setIsDateMenuOpen(true);
+                }}
               />
             </div>
           )}

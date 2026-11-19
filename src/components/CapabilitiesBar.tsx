@@ -28,6 +28,7 @@ interface CapabilitiesBarProps {
   onOpenSecretPromptModal?: () => void;
   onOpenRagasModal?: () => void;
   onOpenVoiceModal?: () => void;
+  onOpenDatePicker?: () => void;
 }
 
 export const CapabilitiesBar: React.FC<CapabilitiesBarProps> = ({
@@ -37,6 +38,7 @@ export const CapabilitiesBar: React.FC<CapabilitiesBarProps> = ({
   onOpenSecretPromptModal,
   onOpenRagasModal,
   onOpenVoiceModal,
+  onOpenDatePicker,
 }) => {
   const toggle = (key: keyof ModelCapabilitiesConfig) => {
     onChangeConfig({
@@ -167,7 +169,7 @@ export const CapabilitiesBar: React.FC<CapabilitiesBarProps> = ({
       {/* System Date Anchor */}
       <button
         type="button"
-        onClick={onOpenSettings}
+        onClick={onOpenDatePicker || onOpenSettings}
         className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors shrink-0 ${
           config.systemDateMode === 'custom'
             ? 'bg-[#282a2c] text-[#8ab4f8] border border-[#3c4043]'

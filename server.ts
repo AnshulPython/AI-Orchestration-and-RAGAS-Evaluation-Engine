@@ -341,12 +341,170 @@ const PROVIDER_MODELS: Record<string, any[]> = {
       intelligenceLevel: 'Very High',
     },
   ],
+  local: [
+    {
+      id: 'Qwen3-0.6B-q4f16_1-MLC',
+      name: 'Qwen3 0.6B (WebGPU)',
+      provider: 'local',
+      description: 'Ultra-fast local Qwen3 model running 100% in your browser via WebGPU.',
+      contextWindow: '32k tokens',
+      capabilities: ['reasoning', 'fastSpeed', 'codeExecution'],
+      recommended: true,
+      minPlanTier: 'free',
+      supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
+      speed: 'Ultra-Fast',
+      intelligenceLevel: 'High',
+      localRuntime: 'webgpu',
+      sizeLabel: '~450 MB',
+    },
+    {
+      id: 'SmolLM2-360M-Instruct-q4f16_1-MLC',
+      name: 'SmolLM2 360M Instruct (WebGPU)',
+      provider: 'local',
+      description: 'Smallest HuggingFace local model (~260 MB) running in browser WebGPU.',
+      contextWindow: '8k tokens',
+      capabilities: ['fastSpeed'],
+      minPlanTier: 'free',
+      supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
+      speed: 'Ultra-Fast',
+      intelligenceLevel: 'Standard',
+      localRuntime: 'webgpu',
+      sizeLabel: '~260 MB',
+    },
+    {
+      id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC',
+      name: 'Llama 3.2 1B Instruct (WebGPU)',
+      provider: 'local',
+      description: 'Meta Llama 3.2 1B running locally in browser WebGPU.',
+      contextWindow: '128k tokens',
+      capabilities: ['fastSpeed', 'codeExecution'],
+      minPlanTier: 'free',
+      supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
+      speed: 'Ultra-Fast',
+      intelligenceLevel: 'High',
+      localRuntime: 'webgpu',
+      sizeLabel: '~880 MB',
+    },
+    {
+      id: 'gemma3-1b-it-q4f16_1-MLC',
+      name: 'Gemma 3 1B Instruct (WebGPU)',
+      provider: 'local',
+      description: 'Google open-weights Gemma 3 1B running locally in WebGPU.',
+      contextWindow: '32k tokens',
+      capabilities: ['fastSpeed', 'codeExecution'],
+      minPlanTier: 'free',
+      supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
+      speed: 'Ultra-Fast',
+      intelligenceLevel: 'High',
+      localRuntime: 'webgpu',
+      sizeLabel: '~750 MB',
+    },
+    {
+      id: 'DeepSeek-R1-Distill-Qwen-1.5B-q4f16_1-MLC',
+      name: 'DeepSeek R1 Distill 1.5B (WebGPU)',
+      provider: 'local',
+      description: 'Local chain-of-thought reasoning model running in browser WebGPU.',
+      contextWindow: '32k tokens',
+      capabilities: ['reasoning', 'codeExecution'],
+      minPlanTier: 'free',
+      supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
+      speed: 'Fast',
+      intelligenceLevel: 'Very High',
+      localRuntime: 'webgpu',
+      sizeLabel: '~1.1 GB',
+    },
+    {
+      id: 'Qwen3-1.7B-q4f16_1-MLC',
+      name: 'Qwen3 1.7B (WebGPU)',
+      provider: 'local',
+      description: 'Balanced Qwen3 model with strong coding and reasoning in WebGPU.',
+      contextWindow: '32k tokens',
+      capabilities: ['reasoning', 'codeExecution'],
+      recommended: true,
+      minPlanTier: 'free',
+      supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
+      speed: 'Fast',
+      intelligenceLevel: 'Very High',
+      localRuntime: 'webgpu',
+      sizeLabel: '~1.1 GB',
+    },
+    {
+      id: 'SmolLM2-1.7B-Instruct-q4f16_1-MLC',
+      name: 'SmolLM2 1.7B Instruct (WebGPU)',
+      provider: 'local',
+      description: 'HuggingFace SmolLM2 1.7B locally accelerated via WebGPU.',
+      contextWindow: '8k tokens',
+      capabilities: ['fastSpeed', 'codeExecution'],
+      minPlanTier: 'free',
+      supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
+      speed: 'Fast',
+      intelligenceLevel: 'High',
+      localRuntime: 'webgpu',
+      sizeLabel: '~1.1 GB',
+    },
+    {
+      id: 'gemma-4-E2B-it-q4f16_1-MLC',
+      name: 'Gemma 4 E2B Instruct (WebGPU)',
+      provider: 'local',
+      description: 'Google next-generation edge Gemma 4 E2B running locally on WebGPU.',
+      contextWindow: '32k tokens',
+      capabilities: ['reasoning', 'codeExecution'],
+      minPlanTier: 'free',
+      supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
+      speed: 'Fast',
+      intelligenceLevel: 'Very High',
+      localRuntime: 'webgpu',
+      sizeLabel: '~1.8 GB',
+    },
+    {
+      id: 'Llama-3.2-3B-Instruct-q4f16_1-MLC',
+      name: 'Llama 3.2 3B Instruct (WebGPU)',
+      provider: 'local',
+      description: 'Meta Llama 3.2 3B delivering strong local reasoning directly in browser.',
+      contextWindow: '128k tokens',
+      capabilities: ['reasoning', 'codeExecution'],
+      minPlanTier: 'free',
+      supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
+      speed: 'Balanced',
+      intelligenceLevel: 'Very High',
+      localRuntime: 'webgpu',
+      sizeLabel: '~2.2 GB',
+    },
+    {
+      id: 'Phi-4-mini-instruct-q4f16_1-MLC',
+      name: 'Phi-4 Mini Instruct (WebGPU)',
+      provider: 'local',
+      description: 'Microsoft Phi-4 Mini 3.8B excelling at STEM and code locally in WebGPU.',
+      contextWindow: '128k tokens',
+      capabilities: ['reasoning', 'codeExecution'],
+      minPlanTier: 'free',
+      supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
+      speed: 'Balanced',
+      intelligenceLevel: 'Very High',
+      localRuntime: 'webgpu',
+      sizeLabel: '~2.4 GB',
+    },
+    {
+      id: 'Qwen3-4B-q4f16_1-MLC',
+      name: 'Qwen3 4B (WebGPU)',
+      provider: 'local',
+      description: 'Flagship in-browser local reasoning model for GPUs with 4GB+ VRAM.',
+      contextWindow: '32k tokens',
+      capabilities: ['reasoning', 'codeExecution'],
+      minPlanTier: 'free',
+      supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
+      speed: 'Balanced',
+      intelligenceLevel: 'Maximum',
+      localRuntime: 'webgpu',
+      sizeLabel: '~2.7 GB',
+    },
+  ],
   custom: [
     {
       id: 'default-custom-model',
       name: 'Custom Endpoint Model',
       provider: 'custom',
-      description: 'Target model served on your OpenAI-compatible endpoint (e.g. llama3, qwen2.5, mistral, etc.)',
+      description: 'Target model served on your custom OpenAI-compatible /v1 endpoint',
       contextWindow: 'Custom',
       capabilities: ['codeExecution'],
       minPlanTier: 'free',
@@ -584,12 +742,21 @@ app.post('/api/validate-key', async (req: Request, res: Response) => {
       });
     }
 
+    if (provider === 'local') {
+      return res.json({
+        valid: true,
+        message: 'Local AI runtime configured! Models execute directly on your machine.',
+        provider: 'local',
+      });
+    }
+
     if (provider === 'custom') {
       const baseUrl = (customBaseUrl || 'http://localhost:11434/v1').replace(/\/+$/, '');
-      const response = await fetch(`${baseUrl}/models`, {
+      const v1Url = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
+      const response = await fetch(`${v1Url}/models`, {
         headers: trimmedKey ? { Authorization: `Bearer ${trimmedKey}` } : {},
       }).catch((err) => {
-        throw new Error(`Failed to reach ${baseUrl}: ${err.message}`);
+        throw new Error(`Failed to reach ${v1Url}: ${err.message}`);
       });
       if (!response.ok) {
         return res.status(response.status).json({
@@ -599,7 +766,7 @@ app.post('/api/validate-key', async (req: Request, res: Response) => {
       }
       return res.json({
         valid: true,
-        message: `Successfully connected to custom endpoint at ${baseUrl}!`,
+        message: `Successfully connected to custom endpoint at ${v1Url}!`,
         provider: 'custom',
       });
     }
@@ -1015,9 +1182,36 @@ app.post('/api/models', async (req: Request, res: Response) => {
         accountChecked = true;
         accountMessage = `Found ${accountModels.length} models active on OpenRouter.`;
       }
+    } else if (provider === 'local') {
+      // Local WebGPU models are curated in-browser; also optionally probe local Ollama if reachable on same host
+      const baseUrl = (customBaseUrl || 'http://localhost:11434').replace(/\/+$/, '');
+      const rootUrl = baseUrl.endsWith('/v1') ? baseUrl.slice(0, -3) : baseUrl;
+      const tagsRes = await fetch(`${rootUrl}/api/tags`).catch(() => null);
+      if (tagsRes && tagsRes.ok) {
+        const data = await tagsRes.json();
+        const ollamaModels = (data.models || []).map((m: any) => {
+          const id = m.name || m.model;
+          return {
+            id,
+            name: `${id} (Ollama)`,
+            provider: 'local',
+            description: `Local Ollama model running at ${rootUrl}`,
+            contextWindow: 'Local',
+            capabilities: ['codeExecution'],
+            isAccountVerified: true,
+            speed: 'Fast',
+            intelligenceLevel: 'Very High',
+            localRuntime: 'ollama',
+          };
+        });
+        accountModels = [...ollamaModels, ...curated];
+        accountChecked = ollamaModels.length > 0;
+        accountMessage = `Found ${ollamaModels.length} Ollama models + ${curated.length} WebGPU browser models.`;
+      }
     } else if (provider === 'custom') {
       const baseUrl = (customBaseUrl || 'http://localhost:11434/v1').replace(/\/+$/, '');
-      const response = await fetch(`${baseUrl}/models`, {
+      const v1Url = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
+      const response = await fetch(`${v1Url}/models`, {
         headers: trimmedKey ? { Authorization: `Bearer ${trimmedKey}` } : {},
       }).catch(() => null);
       if (response && response.ok) {
@@ -1028,7 +1222,7 @@ app.post('/api/models', async (req: Request, res: Response) => {
             id,
             name: id,
             provider: 'custom',
-            description: `Model verified on custom endpoint ${baseUrl}`,
+            description: `Model verified on custom endpoint ${v1Url}`,
             contextWindow: 'Custom',
             capabilities: ['codeExecution'],
             isAccountVerified: true,

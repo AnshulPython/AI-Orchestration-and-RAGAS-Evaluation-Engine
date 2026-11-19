@@ -49,6 +49,21 @@ export const CapabilitiesSettingsModal: React.FC<CapabilitiesSettingsModalProps>
 }) => {
   if (!isOpen) return null;
 
+  const getLocalTodayIso = (offsetDays = 0) => {
+    const d = new Date();
+    if (offsetDays !== 0) {
+      d.setDate(d.getDate() + offsetDays);
+    }
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  const updateSettings = (patch: Partial<ModelCapabilitiesConfig>) => {
+    onChangeConfig({
+      ...config,
+      ...patch,
+    });
+  };
+
   const updateSetting = <K extends keyof ModelCapabilitiesConfig>(
     key: K,
     val: ModelCapabilitiesConfig[K]
@@ -337,7 +352,9 @@ export const CapabilitiesSettingsModal: React.FC<CapabilitiesSettingsModalProps>
                 <span>System Date for LLM</span>
               </div>
               <span className="text-[11px] text-[#8ab4f8] font-mono">
-                {config.systemDateMode === 'custom' ? `Custom: ${config.customSystemDate || new Date().toISOString().split('T')[0]}` : 'Live Device Date'}
+                {config.systemDateMode === 'custom'
+                  ? `Custom: ${config.customSystemDate || getLocalTodayIso()}`
+                  : `Live: ${getLocalTodayIso()}`}
               </span>
             </div>
 
@@ -356,8 +373,10 @@ export const CapabilitiesSettingsModal: React.FC<CapabilitiesSettingsModalProps>
                   <button
                     type="button"
                     onClick={() => {
-                      updateSetting('systemDateMode', 'current');
-                      updateSetting('systemDate', new Date().toISOString().split('T')[0]);
+                      updateSettings({
+                        systemDateMode: 'current',
+                        systemDate: getLocalTodayIso(),
+                      });
                     }}
                     className={`px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                       config.systemDateMode !== 'custom'
@@ -370,10 +389,12 @@ export const CapabilitiesSettingsModal: React.FC<CapabilitiesSettingsModalProps>
                   <button
                     type="button"
                     onClick={() => {
-                      updateSetting('systemDateMode', 'custom');
-                      const dateVal = config.customSystemDate || new Date().toISOString().split('T')[0];
-                      updateSetting('customSystemDate', dateVal);
-                      updateSetting('systemDate', dateVal);
+                      const dateVal = config.customSystemDate || getLocalTodayIso();
+                      updateSettings({
+                        systemDateMode: 'custom',
+                        customSystemDate: dateVal,
+                        systemDate: dateVal,
+                      });
                     }}
                     className={`px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                       config.systemDateMode === 'custom'
@@ -395,15 +416,18 @@ export const CapabilitiesSettingsModal: React.FC<CapabilitiesSettingsModalProps>
                     </label>
                     <input
                       type="date"
-                      value={config.customSystemDate || new Date().toISOString().split('T')[0]}
+                      value={config.customSystemDate || getLocalTodayIso()}
                       onChange={(e) => {
                         const val = e.target.value;
                         if (val) {
-                          updateSetting('customSystemDate', val);
-                          updateSetting('systemDate', val);
+                          updateSettings({
+                            systemDateMode: 'custom',
+                            customSystemDate: val,
+                            systemDate: val,
+                          });
                         }
                       }}
-                      className="px-3 py-1.5 rounded-lg bg-[#131314] border border-[#2d2f31] text-xs text-white font-mono focus:border-[#8ab4f8] focus:outline-none cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg bg-[#131314] border border-[#2d2f31] text-xs text-[#e3e3e3] font-mono focus:border-[#8ab4f8] focus:outline-none cursor-pointer"
                     />
                   </div>
 
@@ -414,15 +438,9 @@ export const CapabilitiesSettingsModal: React.FC<CapabilitiesSettingsModalProps>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {[
-                        { label: 'Today', val: new Date().toISOString().split('T')[0] },
-                        {
-                          label: 'Yesterday',
-                          val: new Date(Date.now() - 86400000).toISOString().split('T')[0],
-                        },
-                        {
-                          label: '1 Year Ago',
-                          val: new Date(Date.now() - 86400000 * 365).toISOString().split('T')[0],
-                        },
+                        { label: 'Today', val: getLocalTodayIso(0) },
+                        { label: 'Yesterday', val: getLocalTodayIso(-1) },
+                        { label: '1 Year Ago', val: getLocalTodayIso(-365) },
                         { label: '2025-01-01', val: '2025-01-01' },
                         { label: '2024-01-01', val: '2024-01-01' },
                         { label: '2020-01-01', val: '2020-01-01' },
@@ -434,8 +452,11 @@ export const CapabilitiesSettingsModal: React.FC<CapabilitiesSettingsModalProps>
                             key={preset.label}
                             type="button"
                             onClick={() => {
-                              updateSetting('customSystemDate', preset.val);
-                              updateSetting('systemDate', preset.val);
+                              updateSettings({
+                                systemDateMode: 'custom',
+                                customSystemDate: preset.val,
+                                systemDate: preset.val,
+                              });
                             }}
                             className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-colors cursor-pointer ${
                               isSelected
@@ -453,7 +474,7 @@ export const CapabilitiesSettingsModal: React.FC<CapabilitiesSettingsModalProps>
                   {/* LLM Prompt Preview */}
                   <div className="text-[11px] bg-[#131314] p-2.5 rounded-lg border border-[#2d2f31] text-[#9aa0a6]">
                     <span className="text-[#8ab4f8] font-semibold">Active LLM Prompt Context: </span>
-                    "Today's current date is {config.customSystemDate || new Date().toISOString().split('T')[0]}. You must consider this exact date as the present time for all reasoning..."
+                    &quot;Today&apos;s current date is {config.customSystemDate || getLocalTodayIso()}. You must consider this exact date as the present time for all reasoning...&quot;
                   </div>
                 </div>
               )}

@@ -3,23 +3,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Key,
   CheckCircle2,
   AlertCircle,
   ExternalLink,
-  Sparkles,
   ShieldCheck,
   Eye,
   EyeOff,
   Trash2,
   ArrowRight,
   Server,
+  Cpu,
+  HardDrive,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { AIProviderId, StoredAPIKeys } from '../types';
+import { AIProviderId, LocalRuntimeMode, StoredAPIKeys } from '../types';
 import { AI_PROVIDERS } from '../data/providersAndModels';
 import {
   getStoredApiKeys,
@@ -29,7 +30,14 @@ import {
   DEFAULT_LIVE_RENDER_BACKEND_URL,
   getLiveBackendUrl,
   LIVE_RENDER_SERVICE_ID,
+  getLocalRuntimeConfig,
+  saveLocalRuntimeConfig,
 } from '../utils/storage';
+import {
+  checkWebGPUSupport,
+  discoverLocalServerModels,
+  type WebGPUStatus,
+} from '../utils/localModels';
 
 interface ProviderSelectorModalProps {
   isOpen: boolean;
@@ -51,22 +59,48 @@ export const ProviderSelectorModal: React.FC<ProviderSelectorModalProps> = ({
   const [keyInput, setKeyInput] = useState<string>(storedKeys[activeProvider] || '');
   const [customBaseUrl, setCustomBaseUrl] = useState<string>(() => {
     const existing = storedKeys.customBaseUrl;
-    if (
-      existing &&
-      !existing.includes('localhost:3001') &&
-      !existing.includes('localhost:5000') &&
-      !existing.includes('localhost:11434')
-    ) {
+    if (existing && !existing.includes('dashboard.render.com')) {
       return existing;
     }
     return getLiveBackendUrl();
   });
+
+  // Local AI runtime state (WebGPU vs Ollama / LM Studio / llama.cpp)
+  const initialLocalCfg = getLocalRuntimeConfig();
+  const [localMode, setLocalMode] = useState<LocalRuntimeMode>(initialLocalCfg.mode);
+  const [localEndpointUrl, setLocalEndpointUrl] = useState<string>(initialLocalCfg.endpointUrl);
+  const [webgpuStatus, setWebgpuStatus] = useState<WebGPUStatus | null>(null);
+  const [checkingWebGPU, setCheckingWebGPU] = useState<boolean>(false);
+
   const [showKey, setShowKey] = useState<boolean>(false);
   const [isValidating, setIsValidating] = useState<boolean>(false);
   const [validationStatus, setValidationStatus] = useState<{
     success?: boolean;
     message?: string;
+    corsHint?: boolean;
   } | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedProvider(activeProvider);
+      const keys = getStoredApiKeys();
+      setStoredKeys(keys);
+      setKeyInput(keys[activeProvider] || '');
+      const cfg = getLocalRuntimeConfig();
+      setLocalMode(cfg.mode);
+      setLocalEndpointUrl(cfg.endpointUrl);
+      setValidationStatus(null);
+    }
+  }, [isOpen, activeProvider]);
+
+  useEffect(() => {
+    if (isOpen && selectedProvider === 'local') {
+      setCheckingWebGPU(true);
+      checkWebGPUSupport()
+        .then((status) => setWebgpuStatus(status))
+        .finally(() => setCheckingWebGPU(false));
+    }
+  }, [isOpen, selectedProvider]);
 
   if (!isOpen) return null;
 
@@ -83,6 +117,73 @@ export const ProviderSelectorModal: React.FC<ProviderSelectorModalProps> = ({
     setIsValidating(true);
     setValidationStatus(null);
     try {
+      if (selectedProvider === 'local') {
+        if (localMode === 'webgpu') {
+          const gpu = await checkWebGPUSupport();
+          setWebgpuStatus(gpu);
+          if (!gpu.supported) {
+            setValidationStatus({
+              success: false,
+              message:
+                gpu.reason ||
+                'WebGPU is not available in this browser. Select Ollama / LM Studio instead to run local models via local server.',
+            });
+            return;
+          }
+
+          saveLocalRuntimeConfig({ mode: 'webgpu', endpointUrl: localEndpointUrl });
+          saveStoredApiKey('local', 'webgpu-enabled');
+          setStoredKeys(getStoredApiKeys());
+          setActiveProvider('local');
+          onProviderChanged('local');
+          try {
+            confetti({ particleCount: 70, spread: 55, origin: { y: 0.6 } });
+          } catch {}
+          setValidationStatus({
+            success: true,
+            message: `WebGPU Local AI ready (${gpu.adapterLabel || 'Hardware GPU'}). Select any open-weights model to run locally in your browser.`,
+          });
+          setTimeout(() => onClose(), 1000);
+          return;
+        } else {
+          // Probe local server directly from user's browser (Ollama / LM Studio / llama.cpp)
+          const probe = await discoverLocalServerModels(localEndpointUrl, localMode);
+          if (!probe.ok) {
+            setValidationStatus({
+              success: false,
+              message:
+                probe.error ||
+                `Could not connect to local server at ${localEndpointUrl}.`,
+              corsHint: probe.corsHint,
+            });
+            return;
+          }
+
+          if (probe.models.length === 0) {
+            setValidationStatus({
+              success: false,
+              message: `Connected to ${localEndpointUrl}, but no downloaded models were found. Pull or load a model first (e.g. "ollama pull qwen3:1.7b").`,
+            });
+            return;
+          }
+
+          saveLocalRuntimeConfig({ mode: localMode, endpointUrl: localEndpointUrl.trim() });
+          saveStoredApiKey('local', `${localMode}:${localEndpointUrl.trim()}`);
+          setStoredKeys(getStoredApiKeys());
+          setActiveProvider('local');
+          onProviderChanged('local');
+          try {
+            confetti({ particleCount: 70, spread: 55, origin: { y: 0.6 } });
+          } catch {}
+          setValidationStatus({
+            success: true,
+            message: `Connected to local ${localMode} server! Discovered ${probe.models.length} real local model(s).`,
+          });
+          setTimeout(() => onClose(), 1000);
+          return;
+        }
+      }
+
       const response = await fetch('/api/validate-key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -122,7 +223,7 @@ export const ProviderSelectorModal: React.FC<ProviderSelectorModalProps> = ({
     } catch (err: any) {
       setValidationStatus({
         success: false,
-        message: err.message || 'Network error while validating key.',
+        message: err.message || 'Network error while validating connection.',
       });
     } finally {
       setIsValidating(false);
@@ -135,7 +236,7 @@ export const ProviderSelectorModal: React.FC<ProviderSelectorModalProps> = ({
     setKeyInput('');
     setValidationStatus({
       success: true,
-      message: `Cleared saved key for ${currentProviderInfo.name}`,
+      message: `Cleared saved credentials for ${currentProviderInfo.name}`,
     });
   };
 
@@ -153,7 +254,7 @@ export const ProviderSelectorModal: React.FC<ProviderSelectorModalProps> = ({
                 Connect AI Provider
               </h2>
               <p className="text-xs text-[#8e918f]">
-                Provide your API key to check your account and retrieve all available models.
+                Connect cloud APIs or run real open-weights local models via WebGPU, Ollama, or LM Studio.
               </p>
             </div>
           </div>
@@ -174,7 +275,11 @@ export const ProviderSelectorModal: React.FC<ProviderSelectorModalProps> = ({
             </div>
             {AI_PROVIDERS.map((provider) => {
               const isSelected = selectedProvider === provider.id;
-              const hasSaved = Boolean(storedKeys[provider.id] || (provider.id === 'gemini' && hasGeminiEnvKey));
+              const hasSaved = Boolean(
+                storedKeys[provider.id] ||
+                  (provider.id === 'gemini' && hasGeminiEnvKey) ||
+                  provider.id === 'local'
+              );
               const isActive = activeProvider === provider.id;
 
               return (
@@ -211,7 +316,9 @@ export const ProviderSelectorModal: React.FC<ProviderSelectorModalProps> = ({
                   {hasSaved && (
                     <div className="flex items-center gap-1 text-[11px] font-medium text-[#81c995] shrink-0">
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">Saved</span>
+                      <span className="hidden sm:inline">
+                        {provider.id === 'local' ? 'Ready' : 'Saved'}
+                      </span>
                     </div>
                   )}
                 </button>
@@ -233,16 +340,166 @@ export const ProviderSelectorModal: React.FC<ProviderSelectorModalProps> = ({
                     {currentProviderInfo.tagline}
                   </p>
                 </div>
-                <a
-                  href={currentProviderInfo.keyHelpUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-xs text-[#8ab4f8] hover:underline transition-colors shrink-0"
-                >
-                  <span>Get API Key</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
+                {selectedProvider !== 'local' && (
+                  <a
+                    href={currentProviderInfo.keyHelpUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-xs text-[#8ab4f8] hover:underline transition-colors shrink-0"
+                  >
+                    <span>Get API Key</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
               </div>
+
+              {selectedProvider === 'local' && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-[#c4c7c5]">
+                      Select Local Execution Engine:
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLocalMode('webgpu');
+                          setValidationStatus(null);
+                        }}
+                        className={`p-3 rounded-xl border text-left transition-colors cursor-pointer ${
+                          localMode === 'webgpu'
+                            ? 'bg-[#282a2c] border-[#81c995] text-white'
+                            : 'bg-[#131314] hover:bg-[#282a2c]/50 border-[#2d2f31] text-[#c4c7c5]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold flex items-center gap-1.5">
+                            <Cpu className="w-3.5 h-3.5 text-[#81c995]" />
+                            In-Browser WebGPU
+                          </span>
+                          <span className="text-[10px] text-[#81c995] font-medium">Zero Setup</span>
+                        </div>
+                        <p className="text-[11px] text-[#8e918f] mt-1 leading-snug">
+                          Downloads quantized weights (Qwen3, Llama 3.2, Gemma, Phi-4) & executes on your GPU directly inside the browser.
+                        </p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLocalMode(localMode === 'webgpu' ? 'ollama' : localMode);
+                          setValidationStatus(null);
+                        }}
+                        className={`p-3 rounded-xl border text-left transition-colors cursor-pointer ${
+                          localMode !== 'webgpu'
+                            ? 'bg-[#282a2c] border-[#8ab4f8] text-white'
+                            : 'bg-[#131314] hover:bg-[#282a2c]/50 border-[#2d2f31] text-[#c4c7c5]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold flex items-center gap-1.5">
+                            <HardDrive className="w-3.5 h-3.5 text-[#8ab4f8]" />
+                            Local Daemon Server
+                          </span>
+                          <span className="text-[10px] text-[#8ab4f8] font-medium">Ollama / LM Studio</span>
+                        </div>
+                        <p className="text-[11px] text-[#8e918f] mt-1 leading-snug">
+                          Connect directly from your browser to Ollama, LM Studio, or llama.cpp running on your machine.
+                        </p>
+                      </button>
+                    </div>
+                  </div>
+
+                  {localMode === 'webgpu' ? (
+                    <div className="p-3.5 rounded-xl bg-[#131314] border border-[#2d2f31] space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-[#e3e3e3]">Browser WebGPU Hardware Check</span>
+                        {checkingWebGPU ? (
+                          <span className="text-[11px] text-[#8ab4f8]">Detecting GPU...</span>
+                        ) : webgpuStatus?.supported ? (
+                          <span className="text-[11px] text-[#81c995] font-medium flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Supported
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-[#f28b82] font-medium flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            Unavailable
+                          </span>
+                        )}
+                      </div>
+                      {webgpuStatus?.supported ? (
+                        <div className="text-[11px] text-[#8e918f] space-y-1">
+                          <div>
+                            Adapter: <code className="text-[#c4c7c5]">{webgpuStatus.adapterLabel}</code>
+                            {webgpuStatus.hasF16 && (
+                              <span className="ml-2 text-[#81c995]">(shader-f16 accelerated)</span>
+                            )}
+                          </div>
+                          <p>
+                            Weights are cached locally in browser CacheStorage after first load so subsequent chats start offline and privately.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-[#f28b82] leading-relaxed">
+                          {webgpuStatus?.reason || 'WebGPU is unavailable in this browser. Switch to Local Daemon Server (Ollama / LM Studio) above.'}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3 p-3.5 rounded-xl bg-[#131314] border border-[#2d2f31]">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[11px] text-[#8e918f] mr-1">Presets:</span>
+                        {[
+                          { mode: 'ollama' as LocalRuntimeMode, label: 'Ollama (:11434)', url: 'http://localhost:11434' },
+                          { mode: 'lmstudio' as LocalRuntimeMode, label: 'LM Studio (:1234)', url: 'http://localhost:1234/v1' },
+                          { mode: 'llamacpp' as LocalRuntimeMode, label: 'llama.cpp (:8080)', url: 'http://localhost:8080/v1' },
+                        ].map((preset) => (
+                          <button
+                            key={preset.mode}
+                            type="button"
+                            onClick={() => {
+                              setLocalMode(preset.mode);
+                              setLocalEndpointUrl(preset.url);
+                              setValidationStatus(null);
+                            }}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors cursor-pointer ${
+                              localMode === preset.mode && localEndpointUrl === preset.url
+                                ? 'bg-[#282a2c] border-[#8ab4f8] text-white'
+                                : 'bg-[#1e1f20] border-[#2d2f31] text-[#8e918f] hover:text-white'
+                            }`}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-medium text-[#c4c7c5] block mb-1">
+                          Local Server URL:
+                        </label>
+                        <input
+                          type="text"
+                          value={localEndpointUrl}
+                          onChange={(e) => {
+                            setLocalEndpointUrl(e.target.value);
+                            setValidationStatus(null);
+                          }}
+                          placeholder="http://localhost:11434"
+                          className="w-full px-3 py-2 bg-[#1e1f20] border border-[#2d2f31] rounded-xl text-xs text-white placeholder-[#8e918f] focus:outline-none focus:border-[#444746] font-mono"
+                        />
+                      </div>
+
+                      <div className="text-[11px] text-[#8e918f] leading-relaxed">
+                        For Ollama in a browser, start Ollama with CORS enabled:{' '}
+                        <code className="text-[#c4c7c5] bg-[#1e1f20] px-1.5 py-0.5 rounded">
+                          OLLAMA_ORIGINS=&quot;*&quot; ollama serve
+                        </code>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {selectedProvider === 'custom' && (
                 <div className="space-y-2">
@@ -272,61 +529,63 @@ export const ProviderSelectorModal: React.FC<ProviderSelectorModalProps> = ({
                       <span>Live Render Service: {LIVE_RENDER_SERVICE_ID}</span>
                     </div>
                     <p className="text-[10px] leading-relaxed">
-                      Connected to live Render deployment (<code className="text-[#8ab4f8]">https://createai-vepb.onrender.com</code>). You can also paste any custom backend proxy URL here.
+                      Connected to live Render deployment (<code className="text-[#8ab4f8]">https://createai-vepb.onrender.com</code>) or any OpenAI-compatible remote <code className="text-[#8ab4f8]">/v1</code> URL.
                     </p>
                   </div>
                 </div>
               )}
 
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-[#c4c7c5] flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <Key className="w-3.5 h-3.5 text-[#8e918f]" />
-                    {currentProviderInfo.name} API Key:
-                  </span>
-                  {storedKeys[selectedProvider] && (
-                    <button
-                      onClick={handleClearKey}
-                      className="text-[11px] text-[#f28b82] hover:underline flex items-center gap-1 transition-colors"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      Remove Key
-                    </button>
-                  )}
-                </label>
-                <div className="relative">
-                  <input
-                    type={showKey ? 'text' : 'password'}
-                    value={keyInput}
-                    onChange={(e) => {
-                      setKeyInput(e.target.value);
-                      setValidationStatus(null);
-                    }}
-                    placeholder={
-                      selectedProvider === 'gemini' && hasGeminiEnvKey
-                        ? 'Leave empty for built-in or enter custom key...'
-                        : `Enter your ${currentProviderInfo.name} API key...`
-                    }
-                    className="w-full pl-3.5 pr-20 py-2.5 bg-[#131314] border border-[#2d2f31] rounded-xl text-xs text-white placeholder-[#8e918f] focus:outline-none focus:border-[#444746] font-mono"
-                  />
-                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setShowKey(!showKey)}
-                      className="p-1.5 text-[#8e918f] hover:text-[#e3e3e3] transition-colors"
-                      title={showKey ? 'Hide key' : 'Show key'}
-                    >
-                      {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
+              {selectedProvider !== 'local' && (
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-[#c4c7c5] flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Key className="w-3.5 h-3.5 text-[#8e918f]" />
+                      {currentProviderInfo.name} API Key:
+                    </span>
+                    {storedKeys[selectedProvider] && (
+                      <button
+                        onClick={handleClearKey}
+                        className="text-[11px] text-[#f28b82] hover:underline flex items-center gap-1 transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        Remove Key
+                      </button>
+                    )}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showKey ? 'text' : 'password'}
+                      value={keyInput}
+                      onChange={(e) => {
+                        setKeyInput(e.target.value);
+                        setValidationStatus(null);
+                      }}
+                      placeholder={
+                        selectedProvider === 'gemini' && hasGeminiEnvKey
+                          ? 'Leave empty for built-in or enter custom key...'
+                          : `Enter your ${currentProviderInfo.name} API key...`
+                      }
+                      className="w-full pl-3.5 pr-20 py-2.5 bg-[#131314] border border-[#2d2f31] rounded-xl text-xs text-white placeholder-[#8e918f] focus:outline-none focus:border-[#444746] font-mono"
+                    />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowKey(!showKey)}
+                        className="p-1.5 text-[#8e918f] hover:text-[#e3e3e3] transition-colors"
+                        title={showKey ? 'Hide key' : 'Show key'}
+                      >
+                        {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-[#8e918f] pt-0.5">
+                    <span className="flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5 text-[#81c995]" />
+                      Stored locally in your browser session.
+                    </span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between text-[11px] text-[#8e918f] pt-0.5">
-                  <span className="flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5 text-[#81c995]" />
-                    Stored locally in your browser session.
-                  </span>
-                </div>
-              </div>
+              )}
 
               {validationStatus && (
                 <div
@@ -341,7 +600,16 @@ export const ProviderSelectorModal: React.FC<ProviderSelectorModalProps> = ({
                   ) : (
                     <AlertCircle className="w-4 h-4 shrink-0 text-[#f28b82] mt-0.5" />
                   )}
-                  <div className="flex-1">{validationStatus.message}</div>
+                  <div className="flex-1 space-y-1.5">
+                    <div>{validationStatus.message}</div>
+                    {validationStatus.corsHint && (
+                      <div className="text-[11px] text-[#c4c7c5] bg-[#131314] p-2 rounded-lg border border-[#2d2f31]">
+                        Tip: If Ollama is running locally, allow browser access with{' '}
+                        <code className="text-[#8ab4f8]">OLLAMA_ORIGINS=&quot;*&quot; ollama serve</code>{' '}
+                        or enable CORS in LM Studio Developer settings.
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -355,17 +623,29 @@ export const ProviderSelectorModal: React.FC<ProviderSelectorModalProps> = ({
               </button>
               <button
                 onClick={handleValidateAndConnect}
-                disabled={isValidating || (!keyInput.trim() && selectedProvider !== 'gemini' && selectedProvider !== 'custom')}
-                className="flex items-center gap-2 px-5 py-2 text-xs font-medium text-[#131314] bg-[#8ab4f8] hover:bg-[#a8c7fa] disabled:opacity-40 disabled:cursor-not-allowed rounded-full transition-colors"
+                disabled={
+                  isValidating ||
+                  (!keyInput.trim() &&
+                    selectedProvider !== 'gemini' &&
+                    selectedProvider !== 'custom' &&
+                    selectedProvider !== 'local')
+                }
+                className="flex items-center gap-2 px-5 py-2 text-xs font-medium text-[#131314] bg-[#8ab4f8] hover:bg-[#a8c7fa] disabled:opacity-40 disabled:cursor-not-allowed rounded-full transition-colors cursor-pointer"
               >
                 {isValidating ? (
                   <>
                     <div className="w-3 h-3 border-2 border-[#131314] border-t-transparent rounded-full animate-spin" />
-                    <span>Validating...</span>
+                    <span>{selectedProvider === 'local' ? 'Checking Local Runtime...' : 'Validating...'}</span>
                   </>
                 ) : (
                   <>
-                    <span>Connect & Load Models</span>
+                    <span>
+                      {selectedProvider === 'local'
+                        ? localMode === 'webgpu'
+                          ? 'Enable Local WebGPU Models'
+                          : 'Connect & Scan Local Models'
+                        : 'Connect & Load Models'}
+                    </span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </>
                 )}

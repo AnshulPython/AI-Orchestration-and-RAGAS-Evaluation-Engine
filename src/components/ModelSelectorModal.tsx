@@ -22,6 +22,10 @@ import {
   Filter,
   AlertCircle,
   ImageIcon,
+  Cpu,
+  Download,
+  Trash2,
+  HardDrive,
 } from 'lucide-react';
 import { AIModel, AIProviderId, CapabilityType, ApiPlanTier } from '../types';
 import { AI_PROVIDERS, PLAN_TIERS } from '../data/providersAndModels';
@@ -30,7 +34,17 @@ import {
   setProviderPlan,
   getFilterOnlyAvailableModels,
   setFilterOnlyAvailableModels,
+  getLocalRuntimeConfig,
 } from '../utils/storage';
+import {
+  checkWebGPUSupport,
+  getCachedWebLLMModels,
+  clearCachedWebLLMModel,
+  ensureWebLLMEngine,
+  getLoadedWebLLMModelId,
+  isWebLLMModelId,
+  type WebGPUStatus,
+} from '../utils/localModels';
 
 interface ModelSelectorModalProps {
   isOpen: boolean;
@@ -67,6 +81,24 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
     model: AIModel;
     requiredPlan: ApiPlanTier;
   } | null>(null);
+  const [cachedLocalModels, setCachedLocalModels] = useState<Record<string, boolean>>({});
+  const [webgpuStatus, setWebgpuStatus] = useState<WebGPUStatus | null>(null);
+  const [downloadingModelId, setDownloadingModelId] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState<{ progress: number; text: string } | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [loadedLocalId, setLoadedLocalId] = useState<string | null>(null);
+
+  const isLocalProvider = provider === 'local';
+  const localConfig = getLocalRuntimeConfig();
+
+  const refreshLocalCacheState = async () => {
+    const webgpuIds = models.filter((m) => isWebLLMModelId(m.id)).map((m) => m.id);
+    if (webgpuIds.length > 0) {
+      const statusMap = await getCachedWebLLMModels(webgpuIds);
+      setCachedLocalModels(statusMap);
+    }
+    setLoadedLocalId(getLoadedWebLLMModelId());
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -74,10 +106,47 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
       setCurrentPlanState(plan);
       setOnlyAvailableState(getFilterOnlyAvailableModels());
       setPlanUpgradePrompt(null);
+      setDownloadError(null);
+      if (provider === 'local') {
+        checkWebGPUSupport().then(setWebgpuStatus);
+        refreshLocalCacheState();
+      }
     }
-  }, [isOpen, provider]);
+  }, [isOpen, provider, models]);
 
   if (!isOpen) return null;
+
+  const handlePreloadLocalModel = async (e: React.MouseEvent, modelId: string) => {
+    e.stopPropagation();
+    setDownloadingModelId(modelId);
+    setDownloadProgress({ progress: 0, text: 'Initializing WebGPU download...' });
+    setDownloadError(null);
+    try {
+      await ensureWebLLMEngine(modelId, (report) => {
+        setDownloadProgress({
+          progress: report.progress ?? 0,
+          text: report.text || 'Loading model weights...',
+        });
+      });
+      await refreshLocalCacheState();
+      onSelectModel(modelId);
+    } catch (err: any) {
+      setDownloadError(err?.message || 'Failed to download/load local model.');
+    } finally {
+      setDownloadingModelId(null);
+      setDownloadProgress(null);
+    }
+  };
+
+  const handleDeleteLocalCache = async (e: React.MouseEvent, modelId: string) => {
+    e.stopPropagation();
+    try {
+      await clearCachedWebLLMModel(modelId);
+      await refreshLocalCacheState();
+    } catch (err: any) {
+      setDownloadError(err?.message || 'Failed to clear cached weights.');
+    }
+  };
 
   const currentProviderInfo =
     AI_PROVIDERS.find((p) => p.id === provider) || AI_PROVIDERS[0];
@@ -155,12 +224,16 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
                 <h2 className="text-base font-semibold text-[#e3e3e3]">
                   Models ({currentProviderInfo.name})
                 </h2>
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#282a2c] text-[#8ab4f8] border border-[#3c4043]">
-                  {currentPlanInfo.label}
-                </span>
+                {!isLocalProvider && (
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#282a2c] text-[#8ab4f8] border border-[#3c4043]">
+                    {currentPlanInfo.label}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-[#8e918f]">
-                Select the AI model for your conversations. Filtered by your active API plan.
+                {isLocalProvider
+                  ? 'Select a real local model to execute privately on your device GPU or local Ollama/LM Studio daemon.'
+                  : 'Select the AI model for your conversations. Filtered by your active API plan.'}
               </p>
             </div>
           </div>
@@ -188,7 +261,7 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
               className="text-xs text-[#c4c7c5] hover:text-white px-3 py-1.5 rounded-full bg-[#282a2c] hover:bg-[#333538] transition-colors flex items-center gap-1 cursor-pointer"
             >
               <Key className="w-3 h-3" />
-              API Key
+              {isLocalProvider ? 'Runtime Setup' : 'API Key'}
             </button>
             <button
               onClick={onClose}
@@ -199,60 +272,122 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
           </div>
         </div>
 
-        {/* API Account Plan Selector Bar */}
-        <div className="px-5 sm:px-6 py-3 bg-[#18191a] border-b border-[#2d2f31] flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <span className="text-xs font-medium text-[#8e918f] flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#8ab4f8]" />
-              Account Plan:
-            </span>
-            <div className="flex items-center gap-1.5 bg-[#1e1f20] p-1 rounded-xl border border-[#2d2f31]">
-              {PLAN_TIERS.map((tier) => {
-                const isActive = currentPlan === tier.id;
-                return (
-                  <button
-                    key={tier.id}
-                    onClick={() => handlePlanSelect(tier.id)}
-                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
-                      isActive
-                        ? 'bg-[#282a2c] text-white shadow-xs border border-[#444746]'
-                        : 'text-[#8e918f] hover:text-[#c4c7c5]'
-                    }`}
-                  >
-                    {tier.id === 'free' && (
-                      <span className="w-2 h-2 rounded-full bg-[#81c995]" />
-                    )}
-                    {tier.id === 'tier1' && (
-                      <Zap className="w-3 h-3 text-[#8ab4f8]" />
-                    )}
-                    {tier.id === 'pro' && (
-                      <Crown className="w-3 h-3 text-[#c58af9]" />
-                    )}
-                    <span>{tier.shortLabel}</span>
-                  </button>
-                );
-              })}
+        {/* Local Runtime Status Bar OR API Account Plan Selector Bar */}
+        {isLocalProvider ? (
+          <div className="px-5 sm:px-6 py-3 bg-[#18191a] border-b border-[#2d2f31] flex flex-col gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-medium text-[#81c995] flex items-center gap-1.5">
+                  {localConfig.mode === 'webgpu' ? (
+                    <Cpu className="w-3.5 h-3.5" />
+                  ) : (
+                    <HardDrive className="w-3.5 h-3.5" />
+                  )}
+                  Runtime: {localConfig.mode === 'webgpu' ? 'In-Browser WebGPU' : `${localConfig.mode.toUpperCase()} (${localConfig.endpointUrl})`}
+                </span>
+                {localConfig.mode === 'webgpu' && webgpuStatus && (
+                  <span className={`text-[11px] px-2 py-0.5 rounded-full border ${
+                    webgpuStatus.supported
+                      ? 'bg-[#81c995]/10 text-[#81c995] border-[#81c995]/30'
+                      : 'bg-[#f28b82]/10 text-[#f28b82] border-[#f28b82]/30'
+                  }`}>
+                    {webgpuStatus.supported
+                      ? `GPU Ready: ${webgpuStatus.adapterLabel || 'WebGPU'}`
+                      : 'WebGPU Unavailable (Switch to Ollama)'}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenProviderModal();
+                }}
+                className="text-[11px] text-[#8ab4f8] hover:underline self-start sm:self-auto cursor-pointer"
+              >
+                Switch WebGPU / Ollama / LM Studio →
+              </button>
+            </div>
+            {downloadingModelId && downloadProgress && (
+              <div className="p-2.5 rounded-xl bg-[#1e1f20] border border-[#8ab4f8]/40 space-y-1.5">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-[#e3e3e3] font-medium">
+                    Loading <code className="text-[#8ab4f8]">{downloadingModelId}</code>
+                  </span>
+                  <span className="font-mono text-[#8ab4f8]">
+                    {Math.round(downloadProgress.progress * 100)}%
+                  </span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-[#131314] overflow-hidden">
+                  <div
+                    className="h-full bg-[#8ab4f8] transition-all duration-200"
+                    style={{ width: `${Math.max(4, Math.round(downloadProgress.progress * 100))}%` }}
+                  />
+                </div>
+                <div className="text-[10px] text-[#8e918f] truncate">{downloadProgress.text}</div>
+              </div>
+            )}
+            {downloadError && (
+              <div className="p-2.5 rounded-xl bg-[#f28b82]/10 border border-[#f28b82]/30 text-[11px] text-[#f28b82]">
+                {downloadError}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="px-5 sm:px-6 py-3 bg-[#18191a] border-b border-[#2d2f31] flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <span className="text-xs font-medium text-[#8e918f] flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#8ab4f8]" />
+                Account Plan:
+              </span>
+              <div className="flex items-center gap-1.5 bg-[#1e1f20] p-1 rounded-xl border border-[#2d2f31]">
+                {PLAN_TIERS.map((tier) => {
+                  const isActive = currentPlan === tier.id;
+                  return (
+                    <button
+                      key={tier.id}
+                      onClick={() => handlePlanSelect(tier.id)}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                        isActive
+                          ? 'bg-[#282a2c] text-white shadow-xs border border-[#444746]'
+                          : 'text-[#8e918f] hover:text-[#c4c7c5]'
+                      }`}
+                    >
+                      {tier.id === 'free' && (
+                        <span className="w-2 h-2 rounded-full bg-[#81c995]" />
+                      )}
+                      {tier.id === 'tier1' && (
+                        <Zap className="w-3 h-3 text-[#8ab4f8]" />
+                      )}
+                      {tier.id === 'pro' && (
+                        <Crown className="w-3 h-3 text-[#c58af9]" />
+                      )}
+                      <span>{tier.shortLabel}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Toggle: Only show available models for this plan */}
+            <div className="flex items-center justify-between sm:justify-end gap-3 pt-1 md:pt-0">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={onlyAvailable}
+                  onChange={(e) => handleToggleOnlyAvailable(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-[#8ab4f8] rounded cursor-pointer"
+                />
+                <span className="text-xs text-[#c4c7c5] font-medium">
+                  Only show available models for this plan
+                </span>
+              </label>
+              <span className="text-[11px] font-mono text-[#8ab4f8] bg-[#282a2c] px-2 py-0.5 rounded-full border border-[#3c4043]">
+                {availableCount} / {models.length} available
+              </span>
             </div>
           </div>
-
-          {/* Toggle: Only show available models for this plan */}
-          <div className="flex items-center justify-between sm:justify-end gap-3 pt-1 md:pt-0">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={onlyAvailable}
-                onChange={(e) => handleToggleOnlyAvailable(e.target.checked)}
-                className="w-3.5 h-3.5 accent-[#8ab4f8] rounded cursor-pointer"
-              />
-              <span className="text-xs text-[#c4c7c5] font-medium">
-                Only show available models for this plan
-              </span>
-            </label>
-            <span className="text-[11px] font-mono text-[#8ab4f8] bg-[#282a2c] px-2 py-0.5 rounded-full border border-[#3c4043]">
-              {availableCount} / {models.length} available
-            </span>
-          </div>
-        </div>
+        )}
 
         {/* Upgrade Plan Prompt Notification (when user clicked an unavailable model) */}
         {planUpgradePrompt && (
@@ -425,24 +560,67 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
                     <span className="font-mono text-[#c4c7c5]">{model.contextWindow}</span>
                     <span className="text-[#8e918f]">•</span>
                     <span className="text-[#8ab4f8] font-medium">{model.speed}</span>
+                    {model.sizeLabel && (
+                      <>
+                        <span className="text-[#8e918f]">•</span>
+                        <span className="text-[#c4c7c5] font-mono">{model.sizeLabel}</span>
+                      </>
+                    )}
                   </div>
 
-                  {/* Plan Tier Badge on card */}
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                      model.minPlanTier === 'pro'
-                        ? 'bg-[#c58af9]/15 text-[#c58af9] border border-[#c58af9]/30'
+                  {isLocalProvider ? (
+                    <div className="flex items-center gap-1.5">
+                      {isWebLLMModelId(model.id) ? (
+                        cachedLocalModels[model.id] ? (
+                          <>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-[#81c995]/15 text-[#81c995] border border-[#81c995]/30">
+                              {loadedLocalId === model.id ? 'Loaded in GPU' : 'Cached Locally'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteLocalCache(e, model.id)}
+                              className="p-1 text-[#8e918f] hover:text-[#f28b82] rounded hover:bg-[#131314] transition-colors cursor-pointer"
+                              title="Delete cached model weights from browser"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => handlePreloadLocalModel(e, model.id)}
+                            disabled={downloadingModelId !== null}
+                            className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium bg-[#8ab4f8]/15 hover:bg-[#8ab4f8]/25 text-[#8ab4f8] border border-[#8ab4f8]/30 transition-colors disabled:opacity-40 cursor-pointer"
+                            title="Pre-download weights to browser CacheStorage"
+                          >
+                            <Download className="w-2.5 h-2.5" />
+                            <span>{downloadingModelId === model.id ? 'Loading...' : 'Download'}</span>
+                          </button>
+                        )
+                      ) : (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-[#81c995]/15 text-[#81c995] border border-[#81c995]/30">
+                          Local Daemon
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    /* Plan Tier Badge on card */
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                        model.minPlanTier === 'pro'
+                          ? 'bg-[#c58af9]/15 text-[#c58af9] border border-[#c58af9]/30'
+                          : model.minPlanTier === 'tier1' || model.isPaid
+                          ? 'bg-[#8ab4f8]/15 text-[#8ab4f8] border border-[#8ab4f8]/30'
+                          : 'bg-[#81c995]/15 text-[#81c995] border border-[#81c995]/30'
+                      }`}
+                    >
+                      {model.minPlanTier === 'pro'
+                        ? 'Pro Plan'
                         : model.minPlanTier === 'tier1' || model.isPaid
-                        ? 'bg-[#8ab4f8]/15 text-[#8ab4f8] border border-[#8ab4f8]/30'
-                        : 'bg-[#81c995]/15 text-[#81c995] border border-[#81c995]/30'
-                    }`}
-                  >
-                    {model.minPlanTier === 'pro'
-                      ? 'Pro Plan'
-                      : model.minPlanTier === 'tier1' || model.isPaid
-                      ? 'Pay-As-You-Go'
-                      : 'Free Plan'}
-                  </span>
+                        ? 'Pay-As-You-Go'
+                        : 'Free Plan'}
+                    </span>
+                  )}
                 </div>
               </div>
             );

@@ -9,6 +9,7 @@ export type AIProviderId =
   | 'mistral'
   | 'openrouter'
   | 'perplexity'
+  | 'local'
   | 'custom';
 
 export interface AIProviderInfo {
@@ -45,6 +46,8 @@ export interface PlanTierInfo {
   color: string;
 }
 
+export type LocalRuntimeMode = 'webgpu' | 'ollama' | 'lmstudio' | 'llamacpp';
+
 export interface AIModel {
   id: string;
   name: string;
@@ -60,6 +63,9 @@ export interface AIModel {
   inputTokens?: number;
   speed: 'Ultra-Fast' | 'Fast' | 'Balanced' | 'Deep-Reasoning';
   intelligenceLevel: 'Maximum' | 'Very High' | 'High' | 'Standard';
+  localRuntime?: LocalRuntimeMode;
+  sizeLabel?: string;
+  vramRequiredMB?: number;
 }
 
 export interface VoiceConfig {
@@ -142,6 +148,11 @@ export interface ChatMessage {
   durationMs?: number;
   attachments?: ChatAttachment[];
   isStreaming?: boolean;
+  localLoadProgress?: {
+    progress: number; // 0 to 1
+    text: string;
+    runtime: LocalRuntimeMode;
+  };
   error?: string;
   isRateLimit?: boolean;
   evaluation?: MessageEvaluationResult;
@@ -245,6 +256,9 @@ export interface StoredAPIKeys {
   mistral?: string;
   openrouter?: string;
   perplexity?: string;
+  local?: string;
+  localRuntimeMode?: LocalRuntimeMode;
+  localEndpointUrl?: string;
   custom?: string;
   customBaseUrl?: string;
 }

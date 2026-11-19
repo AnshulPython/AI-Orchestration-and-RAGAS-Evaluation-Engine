@@ -18,17 +18,19 @@
   --safe-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
 }
 
-.light, [data-theme="light"] {
+html.light,
+.light,
+[data-theme="light"] {
   color-scheme: light;
   --bg-app: #f8f9fa;
   --bg-surface: #ffffff;
-  --bg-hover: #f0f4f9;
-  --bg-hover-subtle: #f8fafd;
-  --border-subtle: #e1e3e1;
-  --border-strong: #dadce0;
+  --bg-hover: #edf2f8;
+  --bg-hover-subtle: #f4f7fb;
+  --border-subtle: #dfe3e8;
+  --border-strong: #c8cdd4;
   --text-main: #1f1f1f;
   --text-sub: #444746;
-  --text-muted: #5e5e5e;
+  --text-muted: #5f6368;
   --accent-primary: #1a73e8;
   --accent-hover: #0b57d0;
   --user-bubble: #e8f0fe;
@@ -48,7 +50,7 @@ html, body, #root {
 }
 
 /* Touch manipulation on mobile */
-button, input, textarea, a {
+button, input, textarea, select, a {
   touch-action: manipulation;
 }
 
@@ -68,93 +70,229 @@ button, input, textarea, a {
   background: #444746;
 }
 
+html.light ::-webkit-scrollbar-thumb,
 .light ::-webkit-scrollbar-thumb {
   background: #dadce0;
 }
+html.light ::-webkit-scrollbar-thumb:hover,
 .light ::-webkit-scrollbar-thumb:hover {
   background: #bdc1c6;
 }
 
-/* Light mode overrides for existing Tailwind utility classes */
-.light html, .light body, .light #root {
+/* Light mode root & surface overrides */
+html.light,
+html.light body,
+html.light #root {
   background-color: #f8f9fa !important;
   color: #1f1f1f !important;
+}
+
+.light .bg-\[\#0e0f10\] {
+  background-color: #f1f3f4 !important;
 }
 
 .light .bg-\[\#131314\] {
   background-color: #f8f9fa !important;
 }
 
+.light .bg-\[\#131314\]\/90 {
+  background-color: rgba(248, 249, 250, 0.92) !important;
+}
+
+.light .bg-\[\#18191a\] {
+  background-color: #ffffff !important;
+}
+
 .light .bg-\[\#1e1f20\] {
   background-color: #ffffff !important;
 }
 
-.light .bg-\[\#282a2c\] {
-  background-color: #f0f4f9 !important;
+.light .bg-\[\#1e1f20\]\/95 {
+  background-color: rgba(255, 255, 255, 0.96) !important;
 }
 
 .light .bg-\[\#202124\] {
-  background-color: #f8fafd !important;
+  background-color: #f4f7fb !important;
+}
+
+.light .bg-\[\#282a2c\] {
+  background-color: #edf2f8 !important;
+}
+
+.light .bg-\[\#2d2f31\] {
+  background-color: #e4e9f0 !important;
 }
 
 .light .bg-\[\#333538\] {
-  background-color: #e3e8f0 !important;
+  background-color: #dfe6f0 !important;
+}
+
+.light .bg-\[\#37393b\] {
+  background-color: #dadfe6 !important;
 }
 
 .light .bg-\[\#3c4043\] {
-  background-color: #dadce0 !important;
+  background-color: #d2d7de !important;
 }
 
-.light .hover\:bg-\[\#282a2c\]:hover {
-  background-color: #f0f4f9 !important;
+/* Light mode accent pills & buttons */
+.light .bg-\[\#8ab4f8\] {
+  background-color: #1a73e8 !important;
 }
 
-.light .hover\:bg-\[\#333538\]:hover {
-  background-color: #e3e8f0 !important;
+.light .bg-\[\#8ab4f8\].text-\[\#131314\],
+.light .bg-\[\#8ab4f8\] .text-\[\#131314\] {
+  color: #ffffff !important;
+}
+
+.light .bg-\[\#8ab4f8\]\/10 {
+  background-color: rgba(26, 115, 232, 0.08) !important;
+}
+
+.light .bg-\[\#8ab4f8\]\/15 {
+  background-color: rgba(26, 115, 232, 0.12) !important;
+}
+
+.light .bg-\[\#8ab4f8\]\/20 {
+  background-color: rgba(26, 115, 232, 0.16) !important;
+}
+
+.light .bg-\[\#81c995\]\/10,
+.light .bg-\[\#81c995\]\/15 {
+  background-color: rgba(24, 128, 56, 0.1) !important;
+}
+
+.light .bg-\[\#f28b82\]\/10,
+.light .bg-\[\#f28b82\]\/15 {
+  background-color: rgba(217, 48, 37, 0.1) !important;
+}
+
+.light .bg-\[\#c58af9\]\/10,
+.light .bg-\[\#c58af9\]\/15,
+.light .bg-\[\#c58af9\]\/20 {
+  background-color: rgba(132, 48, 206, 0.1) !important;
+}
+
+/* Light mode hover backgrounds */
+.light .hover\:bg-\[\#131314\]:hover {
+  background-color: #eef2f6 !important;
+}
+
+.light .hover\:bg-\[\#1e1f20\]:hover {
+  background-color: #f1f5f9 !important;
 }
 
 .light .hover\:bg-\[\#202124\]:hover {
-  background-color: #f8fafd !important;
+  background-color: #f0f4f9 !important;
+}
+
+.light .hover\:bg-\[\#282a2c\]:hover {
+  background-color: #e8eff7 !important;
 }
 
 .light .hover\:bg-\[\#282a2c\]\/50:hover,
-.light .hover\:bg-\[\#282a2c\]\/60:hover {
-  background-color: rgba(240, 244, 249, 0.85) !important;
+.light .hover\:bg-\[\#282a2c\]\/60:hover,
+.light .hover\:bg-\[\#282a2c\]\/70:hover {
+  background-color: rgba(232, 239, 247, 0.85) !important;
 }
 
+.light .hover\:bg-\[\#333538\]:hover,
+.light .hover\:bg-\[\#37393b\]:hover {
+  background-color: #dce5f0 !important;
+}
+
+.light .hover\:bg-\[\#8ab4f8\]\/20:hover,
+.light .hover\:bg-\[\#8ab4f8\]\/25:hover {
+  background-color: rgba(26, 115, 232, 0.2) !important;
+}
+
+.light .hover\:bg-\[\#a8c7fa\]:hover,
+.light .hover\:bg-\[\#aecbfa\]:hover {
+  background-color: #1557b0 !important;
+}
+
+/* Light mode borders */
+.light .border-\[\#131314\],
 .light .border-\[\#2d2f31\],
+.light .border-\[\#2d2f31\]\/60,
 .light .border-\[\#2d2f31\]\/80 {
-  border-color: #e1e3e1 !important;
+  border-color: #dfe3e8 !important;
 }
 
 .light .border-\[\#37393b\],
 .light .border-\[\#3c4043\],
 .light .border-\[\#444746\] {
-  border-color: #dadce0 !important;
+  border-color: #c8cdd4 !important;
 }
 
+.light .border-\[\#8ab4f8\] {
+  border-color: #1a73e8 !important;
+}
+
+.light .border-\[\#8ab4f8\]\/30,
+.light .border-\[\#8ab4f8\]\/40 {
+  border-color: rgba(26, 115, 232, 0.38) !important;
+}
+
+.light .hover\:border-\[\#37393b\]:hover,
+.light .hover\:border-\[\#3c4043\]:hover {
+  border-color: #b8c0cc !important;
+}
+
+/* Light mode text colors */
 .light .text-\[\#e3e3e3\] {
   color: #1f1f1f !important;
 }
 
 .light .text-\[\#c4c7c5\] {
-  color: #444746 !important;
+  color: #3c4043 !important;
 }
 
-.light .text-\[\#8e918f\] {
-  color: #5e5e5e !important;
+.light .text-\[\#8e918f\],
+.light .text-\[\#9aa0a6\] {
+  color: #5f6368 !important;
 }
 
 .light .text-\[\#8ab4f8\] {
   color: #1a73e8 !important;
 }
 
+.light .text-\[\#81c995\] {
+  color: #188038 !important;
+}
+
+.light .text-\[\#f28b82\] {
+  color: #d93025 !important;
+}
+
+.light .text-\[\#c58af9\] {
+  color: #8430ce !important;
+}
+
 .light .text-white:not(.btn-keep-white) {
   color: #1f1f1f !important;
 }
 
+.light .hover\:text-white:hover,
+.light .hover\:text-\[\#e3e3e3\]:hover {
+  color: #111111 !important;
+}
+
+.light .hover\:text-\[\#c4c7c5\]:hover {
+  color: #202124 !important;
+}
+
 .light .placeholder-\[\#8e918f\]::placeholder {
   color: #747775 !important;
+}
+
+/* Light mode gradient overrides */
+.light .from-\[\#282a2c\] {
+  --tw-gradient-from: #edf2f8 !important;
+}
+
+.light .to-\[\#1e1f20\] {
+  --tw-gradient-to: #ffffff !important;
 }
 
 /* Light mode specific element adaptations */
@@ -219,8 +357,20 @@ button, input, textarea, a {
   color: #1f1f1f !important;
 }
 
+/* Native form inputs & date pickers follow active theme */
+input[type="date"] {
+  color-scheme: dark;
+}
+
+.light input[type="date"] {
+  color-scheme: light;
+  color: #1f1f1f !important;
+}
+
 .light input[type="text"],
 .light input[type="password"],
+.light input[type="url"],
+.light select,
 .light textarea {
   color: #1f1f1f !important;
 }
@@ -235,4 +385,3 @@ button, input, textarea, a {
     padding-bottom: max(1.25rem, calc(env(safe-area-inset-bottom, 0px) + 1rem));
   }
 }
-

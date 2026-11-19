@@ -207,6 +207,7 @@ export function getActiveModel(provider: AIProviderId): string {
     if (provider === 'mistral') return 'mistral-large-latest';
     if (provider === 'openrouter') return 'anthropic/claude-3.7-sonnet';
     if (provider === 'perplexity') return 'sonar-pro';
+    if (provider === 'local') return 'Qwen3-0.6B-q4f16_1-MLC';
     return 'default-custom-model';
   } catch {
     return 'gemini-3.8-flash';
@@ -216,6 +217,33 @@ export function getActiveModel(provider: AIProviderId): string {
 export function setActiveModel(provider: AIProviderId, modelId: string): void {
   try {
     localStorage.setItem(`${MODEL_STORAGE_KEY}_${provider}`, modelId);
+  } catch {}
+}
+
+export interface LocalRuntimeConfig {
+  mode: import('../types').LocalRuntimeMode;
+  endpointUrl: string;
+}
+
+const LOCAL_RUNTIME_CONFIG_KEY = 'createai_local_runtime_config_v1';
+
+export function getLocalRuntimeConfig(): LocalRuntimeConfig {
+  try {
+    const raw = localStorage.getItem(LOCAL_RUNTIME_CONFIG_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        mode: parsed.mode || 'webgpu',
+        endpointUrl: parsed.endpointUrl || 'http://localhost:11434',
+      };
+    }
+  } catch {}
+  return { mode: 'webgpu', endpointUrl: 'http://localhost:11434' };
+}
+
+export function saveLocalRuntimeConfig(config: LocalRuntimeConfig): void {
+  try {
+    localStorage.setItem(LOCAL_RUNTIME_CONFIG_KEY, JSON.stringify(config));
   } catch {}
 }
 

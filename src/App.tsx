@@ -32,6 +32,7 @@ import {
   saveStoredTheme,
   applyThemeToDocument,
   resolveActualTheme,
+  getLocalRuntimeConfig,
 } from './utils/storage';
 import { PROVIDER_MODELS } from './data/providersAndModels';
 import { Sidebar } from './components/Sidebar';
@@ -43,6 +44,12 @@ import { SecretPromptModal } from './components/SecretPromptModal';
 import { RagasEvaluationModal } from './components/RagasEvaluationModal';
 import { VoiceSelectorPopover } from './components/VoiceSelectorPopover';
 import { speakMessage, getStoredVoiceConfig, saveStoredVoiceConfig } from './utils/speech';
+import {
+  discoverLocalServerModels,
+  isWebLLMModelId,
+  streamLocalServerChat,
+  streamWebLLMChat,
+} from './utils/localModels';
 
 export default function App() {
   const [provider, setProviderState] = useState<AIProviderId>(getActiveProvider());
@@ -120,6 +127,37 @@ export default function App() {
     const onlyAvailable = getFilterOnlyAvailableModels();
 
     try {
+      if (targetProvider === 'local') {
+        const localCfg = getLocalRuntimeConfig();
+        const webgpuModels = PROVIDER_MODELS.local || [];
+        let combinedModels = [...webgpuModels];
+        let checked = true;
+
+        if (localCfg.mode !== 'webgpu') {
+          const probe = await discoverLocalServerModels(localCfg.endpointUrl, localCfg.mode);
+          if (probe.ok && probe.models.length > 0) {
+            combinedModels = [...probe.models, ...webgpuModels];
+            checked = true;
+          }
+        }
+
+        setModels(combinedModels);
+        setAccountChecked(checked);
+        setTotalAccountModels(combinedModels.length);
+
+        const active = getActiveModel('local');
+        if (!combinedModels.some((m) => m.id === active)) {
+          const recommended = combinedModels.find((m) => m.recommended) || combinedModels[0];
+          if (recommended) {
+            setModelIdState(recommended.id);
+            setActiveModel('local', recommended.id);
+          }
+        } else if (active !== modelId && targetProvider === provider) {
+          setModelIdState(active);
+        }
+        return;
+      }
+
       const res = await fetch('/api/models', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -482,89 +520,191 @@ export default function App() {
     const historyToSend = [...messages, userMessage].slice(-historyDepth);
 
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider,
-          apiKey,
-          customBaseUrl,
-          model: modelId,
-          messages: historyToSend,
-          capabilities,
-          secretPrompt: currentSession?.secretPrompt ?? capabilities.secretPrompt,
-          secretPromptEnabled:
-            currentSession?.secretPromptEnabled ?? capabilities.secretPromptEnabled,
-        }),
-        signal: controller.signal,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server returned HTTP ${response.status}`);
-      }
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
       let accumulatedContent = '';
       let accumulatedThinking = '';
       let accumulatedSources: Array<{ title: string; url: string }> = [];
 
-      if (!reader) throw new Error('Stream reader not available');
+      if (provider === 'local') {
+        const localCfg = getLocalRuntimeConfig();
+        const useWebGPU = isWebLLMModelId(modelId);
+        const secretPrompt = currentSession?.secretPrompt ?? capabilities.secretPrompt;
+        const secretPromptEnabled =
+          currentSession?.secretPromptEnabled ?? capabilities.secretPromptEnabled;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+        const callbacks = {
+          onProgress: (report: { progress: number; text: string; runtime: any }) => {
+            updateSessionMessages(
+              currentSession.id,
+              (prev) =>
+                prev.map((m) =>
+                  m.id === assistantMessageId
+                    ? {
+                        ...m,
+                        localLoadProgress: report,
+                      }
+                    : m
+                ),
+              undefined,
+              false
+            );
+          },
+          onChunk: (chunk: string) => {
+            accumulatedContent += chunk;
+            updateSessionMessages(
+              currentSession.id,
+              (prev) =>
+                prev.map((m) =>
+                  m.id === assistantMessageId
+                    ? {
+                        ...m,
+                        content: accumulatedContent,
+                        thinking: accumulatedThinking,
+                        localLoadProgress: undefined,
+                      }
+                    : m
+                ),
+              undefined,
+              false
+            );
+          },
+          onThinkingChunk: (thinkingChunk: string) => {
+            accumulatedThinking += thinkingChunk;
+            updateSessionMessages(
+              currentSession.id,
+              (prev) =>
+                prev.map((m) =>
+                  m.id === assistantMessageId
+                    ? {
+                        ...m,
+                        thinking: accumulatedThinking,
+                        localLoadProgress: undefined,
+                      }
+                    : m
+                ),
+              undefined,
+              false
+            );
+          },
+        };
 
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('data: ')) {
-            const dataStr = trimmed.slice(6);
-            if (dataStr === '[DONE]') continue;
-            try {
-              const parsed = JSON.parse(dataStr);
-              if (parsed.error) {
-                const errObj = new Error(parsed.error);
-                (errObj as any).isRateLimit = Boolean(parsed.isRateLimit);
-                throw errObj;
-              }
-              if (parsed.chunk) {
-                accumulatedContent += parsed.chunk;
-              }
-              if (parsed.modelUsed && parsed.modelUsed !== modelId) {
-                // If fallback model was used, update model ID in session
-                setModelIdState(parsed.modelUsed);
-              }
-              if (parsed.thinkingChunk) {
-                accumulatedThinking += parsed.thinkingChunk;
-              }
-              if (parsed.sources && Array.isArray(parsed.sources)) {
-                accumulatedSources = [...accumulatedSources, ...parsed.sources];
-              }
+        if (useWebGPU) {
+          await streamWebLLMChat(
+            {
+              modelId,
+              messages: historyToSend,
+              capabilities,
+              secretPrompt,
+              secretPromptEnabled,
+              signal: controller.signal,
+            },
+            callbacks
+          );
+        } else {
+          await streamLocalServerChat(
+            {
+              endpointUrl: localCfg.endpointUrl,
+              mode: localCfg.mode,
+              modelId,
+              messages: historyToSend,
+              capabilities,
+              secretPrompt,
+              secretPromptEnabled,
+              apiKey,
+              signal: controller.signal,
+            },
+            callbacks
+          );
+        }
+      } else {
+        const now = new Date();
+        const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const effectiveSystemDate =
+          capabilities.systemDateMode === 'custom' && capabilities.customSystemDate
+            ? capabilities.customSystemDate
+            : localToday;
 
-              updateSessionMessages(
-                currentSession.id,
-                (prev) =>
-                  prev.map((m) =>
-                    m.id === assistantMessageId
-                      ? {
-                          ...m,
-                          content: accumulatedContent,
-                          thinking: accumulatedThinking,
-                          sources: accumulatedSources,
-                          modelUsed: parsed.modelUsed || m.modelUsed,
-                        }
-                      : m
-                  ),
-                undefined,
-                false
-              );
-            } catch (err: any) {
-              if (err.message && !err.message.includes('JSON')) {
-                throw err;
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider,
+            apiKey,
+            customBaseUrl,
+            model: modelId,
+            messages: historyToSend,
+            capabilities,
+            systemDate: effectiveSystemDate,
+            secretPrompt: currentSession?.secretPrompt ?? capabilities.secretPrompt,
+            secretPromptEnabled:
+              currentSession?.secretPromptEnabled ?? capabilities.secretPromptEnabled,
+          }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Server returned HTTP ${response.status}`);
+        }
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        if (!reader) throw new Error('Stream reader not available');
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('data: ')) {
+              const dataStr = trimmed.slice(6);
+              if (dataStr === '[DONE]') continue;
+              try {
+                const parsed = JSON.parse(dataStr);
+                if (parsed.error) {
+                  const errObj = new Error(parsed.error);
+                  (errObj as any).isRateLimit = Boolean(parsed.isRateLimit);
+                  throw errObj;
+                }
+                if (parsed.chunk) {
+                  accumulatedContent += parsed.chunk;
+                }
+                if (parsed.modelUsed && parsed.modelUsed !== modelId) {
+                  // If fallback model was used, update model ID in session
+                  setModelIdState(parsed.modelUsed);
+                }
+                if (parsed.thinkingChunk) {
+                  accumulatedThinking += parsed.thinkingChunk;
+                }
+                if (parsed.sources && Array.isArray(parsed.sources)) {
+                  accumulatedSources = [...accumulatedSources, ...parsed.sources];
+                }
+
+                updateSessionMessages(
+                  currentSession.id,
+                  (prev) =>
+                    prev.map((m) =>
+                      m.id === assistantMessageId
+                        ? {
+                            ...m,
+                            content: accumulatedContent,
+                            thinking: accumulatedThinking,
+                            sources: accumulatedSources,
+                            modelUsed: parsed.modelUsed || m.modelUsed,
+                          }
+                        : m
+                    ),
+                  undefined,
+                  false
+                );
+              } catch (err: any) {
+                if (err.message && !err.message.includes('JSON')) {
+                  throw err;
+                }
               }
             }
           }
@@ -580,6 +720,7 @@ export default function App() {
               ? {
                   ...m,
                   isStreaming: false,
+                  localLoadProgress: undefined,
                   durationMs,
                 }
               : m
@@ -599,7 +740,9 @@ export default function App() {
       if (err.name === 'AbortError') {
         updateSessionMessages(currentSession.id, (prev) =>
           prev.map((m) =>
-            m.id === assistantMessageId ? { ...m, isStreaming: false } : m
+            m.id === assistantMessageId
+              ? { ...m, isStreaming: false, localLoadProgress: undefined }
+              : m
           )
         );
       } else {
@@ -636,6 +779,7 @@ export default function App() {
                   error: rawErr,
                   isRateLimit,
                   isStreaming: false,
+                  localLoadProgress: undefined,
                 }
               : m
           )
@@ -671,7 +815,7 @@ export default function App() {
 
   const storedKeys = getStoredApiKeys();
   const isKeyConnected = Boolean(
-    storedKeys[provider] || (provider === 'gemini' && hasGeminiEnvKey)
+    storedKeys[provider] || (provider === 'gemini' && hasGeminiEnvKey) || provider === 'local'
   );
 
   return (
@@ -705,6 +849,9 @@ export default function App() {
         activeModelId={modelId}
         isOpen={isSidebarOpen}
         onToggleOpen={() => setIsSidebarOpen(!isSidebarOpen)}
+        theme={theme}
+        actualTheme={actualTheme}
+        onToggleTheme={handleToggleTheme}
       />
 
       {/* Main Chat Area */}
@@ -735,6 +882,10 @@ export default function App() {
           onOpenSecretPromptModal={() => setIsSecretPromptModalOpen(true)}
           onOpenRagasModal={() => setIsRagasModalOpen(true)}
           onAddImageMessage={handleAddImageMessage}
+          theme={theme}
+          actualTheme={actualTheme}
+          onToggleTheme={handleToggleTheme}
+          onThemeChange={handleThemeChange}
         />
       </main>
 
@@ -775,6 +926,8 @@ export default function App() {
         activeModelId={modelId}
         onOpenSecretPrompt={() => setIsSecretPromptModalOpen(true)}
         onOpenVoiceModal={() => setIsVoiceModalOpen(true)}
+        theme={theme}
+        onThemeChange={handleThemeChange}
       />
 
       {/* Inviolable Secret Prompt Modal */}
