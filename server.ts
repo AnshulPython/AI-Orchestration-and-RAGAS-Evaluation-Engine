@@ -2165,7 +2165,66 @@ app.post('/api/chat', async (req: Request, res: Response) => {
         mId === 'gemini-4-hydrogen' ||
         mId === 'gemini-4-neon' ||
         mId === 'gemini-4-carbon' ||
-        mId === 'gemini-4-argon';
+        mId === 'gemini-4-argon' ||
+        mId.startsWith('gemini-4');
+
+      const supportsGeminiXHigh = (mId: string) =>
+        mId === 'gemini-4-neon' || mId === 'gemini-4-hydrogen';
+
+      const reasoningEnabled = capabilities.reasoning !== false;
+      const rawDepth = String(capabilities.thinkingLevel || 'high').toLowerCase();
+      const thinkingDepth: 'low' | 'medium' | 'high' | 'xhigh' =
+        rawDepth === 'low' || rawDepth === 'medium' || rawDepth === 'high' || rawDepth === 'xhigh'
+          ? rawDepth
+          : rawDepth === 'minimal'
+          ? 'low'
+          : 'high';
+
+      const buildGeminiThinkingConfig = (mId: string): Record<string, any> | undefined => {
+        if (isGemini4Series(mId)) {
+          // Gemini 4 supports LOW, MEDIUM, HIGH (and XHIGH on neon/hydrogen only); never MINIMAL or thinkingBudget
+          if (!reasoningEnabled) {
+            return { thinkingLevel: ThinkingLevel.LOW, includeThoughts: false };
+          }
+          let level: ThinkingLevel = ThinkingLevel.HIGH;
+          if (thinkingDepth === 'low') level = ThinkingLevel.LOW;
+          else if (thinkingDepth === 'medium') level = ThinkingLevel.MEDIUM;
+          else if (thinkingDepth === 'high') level = ThinkingLevel.HIGH;
+          else if (thinkingDepth === 'xhigh') {
+            level = supportsGeminiXHigh(mId) ? ThinkingLevel.XHIGH : ThinkingLevel.HIGH;
+          }
+          return { thinkingLevel: level, includeThoughts: true };
+        }
+
+        if (mId.includes('gemini-3')) {
+          // Gemini 3 supports MINIMAL, LOW, MEDIUM, HIGH (not XHIGH)
+          if (!reasoningEnabled) {
+            return { thinkingLevel: ThinkingLevel.MINIMAL, includeThoughts: false };
+          }
+          let level: ThinkingLevel = ThinkingLevel.HIGH;
+          if (thinkingDepth === 'low') level = ThinkingLevel.LOW;
+          else if (thinkingDepth === 'medium') level = ThinkingLevel.MEDIUM;
+          else level = ThinkingLevel.HIGH;
+          return { thinkingLevel: level, includeThoughts: true };
+        }
+
+        if (mId.includes('gemini-2.5')) {
+          // Gemini 2.5 uses thinkingBudget instead of thinkingLevel
+          if (!reasoningEnabled) {
+            return {
+              thinkingBudget: mId.includes('pro') ? 128 : 0,
+              includeThoughts: false,
+            };
+          }
+          const budgetMap = { low: 1024, medium: 4096, high: 8192, xhigh: 16384 } as const;
+          return {
+            thinkingBudget: budgetMap[thinkingDepth],
+            includeThoughts: true,
+          };
+        }
+
+        return undefined;
+      };
 
       if (!isGemini4Series(resolvedModel)) {
         if (typeof capabilities.temperature === 'number') {
@@ -2182,13 +2241,9 @@ app.post('/api/chat', async (req: Request, res: Response) => {
         genConfig.tools = [{ googleSearch: {} }];
       }
 
-      if (capabilities.reasoning && (resolvedModel.includes('gemini-3') || resolvedModel.includes('gemini-4'))) {
-        let level: ThinkingLevel = ThinkingLevel.HIGH;
-        if (capabilities.thinkingLevel === 'low') level = ThinkingLevel.LOW;
-        if (capabilities.thinkingLevel === 'minimal') {
-          level = isGemini4Series(resolvedModel) ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL;
-        }
-        genConfig.thinkingConfig = { thinkingLevel: level };
+      const initialThinkingCfg = buildGeminiThinkingConfig(resolvedModel);
+      if (initialThinkingCfg) {
+        genConfig.thinkingConfig = initialThinkingCfg;
       }
 
       // Candidate models for graceful fallback if primary model encounters 429 quota or 503 demand
@@ -2214,19 +2269,21 @@ app.post('/api/chat', async (req: Request, res: Response) => {
           const isFallbackModel = candidateModel !== resolvedModel;
           const isFallbackKey = kIdx > 0;
 
-          const attemptConfig = { ...genConfig };
+          const attemptConfig: any = { ...genConfig };
           if (isGemini4Series(candidateModel)) {
             delete attemptConfig.temperature;
             delete attemptConfig.topP;
             delete attemptConfig.topK;
             delete attemptConfig.candidateCount;
-            if (attemptConfig.thinkingConfig?.thinkingLevel === ThinkingLevel.MINIMAL) {
-              attemptConfig.thinkingConfig = { thinkingLevel: ThinkingLevel.LOW };
-            }
           }
-          if (!candidateModel.includes('gemini-3') && !candidateModel.includes('gemini-4') && attemptConfig.thinkingConfig) {
+          const candidateThinkingCfg = buildGeminiThinkingConfig(candidateModel);
+          if (candidateThinkingCfg) {
+            attemptConfig.thinkingConfig = candidateThinkingCfg;
+          } else {
             delete attemptConfig.thinkingConfig;
           }
+
+          let retriedWithoutThinking = false;
 
           // Try up to 2 attempts with backoff if rate limited (burst quota handling)
           for (let attempt = 0; attempt < 2; attempt++) {
@@ -2244,7 +2301,24 @@ app.post('/api/chat', async (req: Request, res: Response) => {
               });
 
               for await (const chunk of streamResponse) {
-                const text = chunk.text || '';
+                let text = '';
+                let thinkingText = '';
+                const parts = chunk.candidates?.[0]?.content?.parts;
+                if (Array.isArray(parts) && parts.length > 0) {
+                  for (const part of parts as any[]) {
+                    if (typeof part?.text !== 'string' || !part.text) continue;
+                    if (part.thought === true) {
+                      if (reasoningEnabled) {
+                        thinkingText += part.text;
+                      }
+                    } else {
+                      text += part.text;
+                    }
+                  }
+                } else {
+                  text = chunk.text || '';
+                }
+
                 let sources: any[] = [];
                 const grounding = chunk.candidates?.[0]?.groundingMetadata;
                 if (grounding?.groundingChunks) {
@@ -2255,11 +2329,15 @@ app.post('/api/chat', async (req: Request, res: Response) => {
                       url: c.web.uri,
                     }));
                 }
-                sendEvent({
-                  chunk: text,
-                  sources: sources.length > 0 ? sources : undefined,
-                  modelUsed: candidateModel,
-                });
+
+                if (text || thinkingText || sources.length > 0) {
+                  sendEvent({
+                    chunk: text,
+                    thinkingChunk: thinkingText || undefined,
+                    sources: sources.length > 0 ? sources : undefined,
+                    modelUsed: candidateModel,
+                  });
+                }
               }
 
               streamSucceeded = true;
@@ -2286,6 +2364,32 @@ app.post('/api/chat', async (req: Request, res: Response) => {
                 `[Gemini Stream] Key #${kIdx + 1}, model ${candidateModel}, attempt ${attempt + 1} failed (isQuota: ${isQuota}):`,
                 errMsg.slice(0, 160)
               );
+
+              // If a model rejects thinkingConfig / thinkingLevel / includeThoughts with a 400 error, downgrade and retry immediately
+              const isThinkingParamError =
+                !retriedWithoutThinking &&
+                Boolean(attemptConfig.thinkingConfig) &&
+                (errMsg.includes('thinking') ||
+                  errMsg.includes('Thinking') ||
+                  errMsg.includes('includeThoughts') ||
+                  errMsg.includes('INVALID_ARGUMENT'));
+
+              if (isThinkingParamError) {
+                retriedWithoutThinking = true;
+                if (
+                  attemptConfig.thinkingConfig?.thinkingLevel === ThinkingLevel.XHIGH ||
+                  attemptConfig.thinkingConfig?.thinkingLevel === ThinkingLevel.MEDIUM
+                ) {
+                  attemptConfig.thinkingConfig = {
+                    thinkingLevel: ThinkingLevel.HIGH,
+                    includeThoughts: reasoningEnabled,
+                  };
+                } else {
+                  delete attemptConfig.thinkingConfig;
+                }
+                attempt--;
+                continue;
+              }
 
               // If a search-enabled call fails with 429, isolate search grounding and retry immediately without search tool
               const hasSearchGrounding = Boolean(
@@ -2435,18 +2539,38 @@ app.post('/api/chat', async (req: Request, res: Response) => {
         bodyPayload.system = anthropicSystem;
       }
 
+      const reasoningEnabled = capabilities.reasoning !== false;
+      const rawAnthropicDepth = String(capabilities.thinkingLevel || 'high').toLowerCase();
+      const anthropicDepth: 'low' | 'medium' | 'high' | 'xhigh' =
+        rawAnthropicDepth === 'low' ||
+        rawAnthropicDepth === 'medium' ||
+        rawAnthropicDepth === 'high' ||
+        rawAnthropicDepth === 'xhigh'
+          ? rawAnthropicDepth
+          : 'high';
+
       const supportsAnthropicThinking =
         model.includes('3-7') ||
         model.includes('sonnet-4') ||
         model.includes('opus-4') ||
+        model.includes('haiku-4') ||
         model.includes('-4-');
-      if (capabilities.reasoning && supportsAnthropicThinking) {
+      if (reasoningEnabled && supportsAnthropicThinking) {
+        const budgetMap = { low: 1024, medium: 4096, high: 10240, xhigh: 24576 } as const;
+        const budgetTokens = budgetMap[anthropicDepth];
         bodyPayload.thinking = {
           type: 'enabled',
-          budget_tokens: capabilities.thinkingLevel === 'high' ? 4096 : 2048,
+          budget_tokens: budgetTokens,
         };
-      } else if (typeof capabilities.temperature === 'number') {
-        bodyPayload.temperature = capabilities.temperature;
+        // Anthropic requires max_tokens to be strictly greater than thinking.budget_tokens
+        bodyPayload.max_tokens = Math.max(capabilities.maxTokens || 4096, budgetTokens + 2048);
+      } else {
+        if (supportsAnthropicThinking) {
+          bodyPayload.thinking = { type: 'disabled' };
+        }
+        if (typeof capabilities.temperature === 'number') {
+          bodyPayload.temperature = capabilities.temperature;
+        }
       }
 
       const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -2487,7 +2611,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
               if (parsed.type === 'content_block_delta') {
                 if (parsed.delta?.type === 'text_delta') {
                   sendEvent({ chunk: parsed.delta.text });
-                } else if (parsed.delta?.type === 'thinking_delta') {
+                } else if (parsed.delta?.type === 'thinking_delta' && reasoningEnabled) {
                   sendEvent({ thinkingChunk: parsed.delta.thinking });
                 }
               }
@@ -2579,13 +2703,24 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       }
     }
 
+    const reasoningEnabled = capabilities.reasoning !== false;
+    const rawCompatDepth = String(capabilities.thinkingLevel || 'high').toLowerCase();
+    const compatDepth: 'low' | 'medium' | 'high' | 'xhigh' =
+      rawCompatDepth === 'low' ||
+      rawCompatDepth === 'medium' ||
+      rawCompatDepth === 'high' ||
+      rawCompatDepth === 'xhigh'
+        ? rawCompatDepth
+        : 'high';
+
+    const lowerModel = String(model || '').toLowerCase();
     const isOpenAIReasoningModel =
       provider === 'openai' &&
-      (model.startsWith('o1') ||
-        model.startsWith('o3') ||
-        model.startsWith('o4') ||
-        model.startsWith('o5') ||
-        model.startsWith('gpt-5'));
+      (lowerModel.startsWith('o1') ||
+        lowerModel.startsWith('o3') ||
+        lowerModel.startsWith('o4') ||
+        lowerModel.startsWith('o5') ||
+        lowerModel.startsWith('gpt-5'));
 
     const payload: any = {
       model,
@@ -2594,11 +2729,42 @@ app.post('/api/chat', async (req: Request, res: Response) => {
     };
 
     if (isOpenAIReasoningModel) {
-      payload.max_completion_tokens = capabilities.maxTokens ?? 4096;
+      const baseMax = capabilities.maxTokens ?? 4096;
+      const depthMinTokens =
+        compatDepth === 'xhigh' ? 16384 : compatDepth === 'high' ? 8192 : baseMax;
+      payload.max_completion_tokens = Math.max(baseMax, depthMinTokens);
+
+      if (!reasoningEnabled) {
+        payload.reasoning_effort = lowerModel.startsWith('gpt-5') ? 'minimal' : 'low';
+      } else {
+        payload.reasoning_effort =
+          compatDepth === 'xhigh' ? 'high' : compatDepth;
+      }
     } else {
       payload.temperature = capabilities.temperature ?? 0.7;
       payload.top_p = capabilities.topP ?? 0.95;
       payload.max_tokens = capabilities.maxTokens ?? 4096;
+    }
+
+    if (provider === 'openrouter') {
+      if (!reasoningEnabled) {
+        payload.reasoning = { enabled: false, exclude: true };
+      } else {
+        payload.reasoning = { effort: compatDepth, exclude: false };
+      }
+    } else if (provider === 'groq') {
+      if (lowerModel.includes('gpt-oss')) {
+        payload.reasoning_effort = reasoningEnabled
+          ? compatDepth === 'xhigh'
+            ? 'high'
+            : compatDepth
+          : 'low';
+        payload.include_reasoning = reasoningEnabled;
+      } else if (lowerModel.includes('qwen')) {
+        payload.reasoning_effort = reasoningEnabled ? 'default' : 'none';
+      } else if (lowerModel.includes('deepseek') || lowerModel.includes('r1')) {
+        payload.reasoning_format = reasoningEnabled ? 'parsed' : 'hidden';
+      }
     }
 
     const headers: Record<string, string> = {
@@ -2612,11 +2778,35 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       headers['X-Title'] = 'CreateAI';
     }
 
-    const response = await fetch(endpointUrl, {
+    let response = await fetch(endpointUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
     });
+
+    // If a provider/model does not accept reasoning parameters (HTTP 400), retry cleanly without them
+    if (
+      !response.ok &&
+      response.status === 400 &&
+      (payload.reasoning_effort !== undefined ||
+        payload.reasoning !== undefined ||
+        payload.reasoning_format !== undefined ||
+        payload.include_reasoning !== undefined)
+    ) {
+      const retryPayload = { ...payload };
+      delete retryPayload.reasoning_effort;
+      delete retryPayload.reasoning;
+      delete retryPayload.reasoning_format;
+      delete retryPayload.include_reasoning;
+      const retryRes = await fetch(endpointUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(retryPayload),
+      });
+      if (retryRes.ok) {
+        response = retryRes;
+      }
+    }
 
     if (!response.ok) {
       const errText = await response.text();
@@ -2633,6 +2823,62 @@ app.post('/api/chat', async (req: Request, res: Response) => {
     let buffer = '';
 
     if (!reader) return sendError('Could not open stream reader from provider');
+
+    // Split inline <think>...</think> blocks cleanly (and suppress them when thinking steps are disabled)
+    let thinkBuffer = '';
+    let insideThink = false;
+    const processThinkTags = (deltaText: string, flush = false) => {
+      thinkBuffer += deltaText;
+      while (thinkBuffer.length > 0) {
+        if (!insideThink) {
+          const openIdx = thinkBuffer.indexOf('<think>');
+          if (openIdx !== -1) {
+            const before = thinkBuffer.slice(0, openIdx);
+            if (before) sendEvent({ chunk: before });
+            thinkBuffer = thinkBuffer.slice(openIdx + 7);
+            insideThink = true;
+            continue;
+          }
+          if (!flush) {
+            const lastLt = thinkBuffer.lastIndexOf('<');
+            if (lastLt !== -1 && '<think>'.startsWith(thinkBuffer.slice(lastLt))) {
+              const safe = thinkBuffer.slice(0, lastLt);
+              if (safe) sendEvent({ chunk: safe });
+              thinkBuffer = thinkBuffer.slice(lastLt);
+              break;
+            }
+          }
+          sendEvent({ chunk: thinkBuffer });
+          thinkBuffer = '';
+          break;
+        } else {
+          const closeIdx = thinkBuffer.indexOf('</think>');
+          if (closeIdx !== -1) {
+            const thinkContent = thinkBuffer.slice(0, closeIdx);
+            if (thinkContent && reasoningEnabled) {
+              sendEvent({ thinkingChunk: thinkContent });
+            }
+            thinkBuffer = thinkBuffer.slice(closeIdx + 8);
+            insideThink = false;
+            continue;
+          }
+          if (!flush) {
+            const lastLt = thinkBuffer.lastIndexOf('<');
+            if (lastLt !== -1 && '</think>'.startsWith(thinkBuffer.slice(lastLt))) {
+              const safe = thinkBuffer.slice(0, lastLt);
+              if (safe && reasoningEnabled) sendEvent({ thinkingChunk: safe });
+              thinkBuffer = thinkBuffer.slice(lastLt);
+              break;
+            }
+          }
+          if (reasoningEnabled) {
+            sendEvent({ thinkingChunk: thinkBuffer });
+          }
+          thinkBuffer = '';
+          break;
+        }
+      }
+    };
 
     while (true) {
       const { done, value } = await reader.read();
@@ -2652,14 +2898,19 @@ app.post('/api/chat', async (req: Request, res: Response) => {
             const parsed = JSON.parse(dataStr);
             const delta = parsed.choices?.[0]?.delta;
             if (delta) {
-              const chunk = delta.content || '';
-              const thinkingChunk = delta.reasoning_content || delta.reasoning || '';
-              sendEvent({ chunk, thinkingChunk });
+              const rawReasoning = delta.reasoning_content || delta.reasoning || '';
+              if (rawReasoning && reasoningEnabled) {
+                sendEvent({ thinkingChunk: rawReasoning });
+              }
+              if (delta.content) {
+                processThinkTags(delta.content, false);
+              }
             }
           } catch {}
         }
       }
     }
+    processThinkTags('', true);
     return sendDone();
   } catch (err: any) {
     return sendError(err.message || 'An unexpected error occurred during chat generation.');

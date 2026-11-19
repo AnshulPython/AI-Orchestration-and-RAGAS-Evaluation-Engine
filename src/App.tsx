@@ -543,6 +543,7 @@ export default function App() {
       role: 'assistant',
       content: '',
       thinking: '',
+      thinkingDepthUsed: capabilities.reasoning ? capabilities.thinkingLevel : 'off',
       timestamp: Date.now(),
       modelUsed: modelId,
       providerUsed: provider,
@@ -620,6 +621,7 @@ export default function App() {
             );
           },
           onThinkingChunk: (thinkingChunk: string) => {
+            if (!capabilities.reasoning) return;
             accumulatedThinking += thinkingChunk;
             updateSessionMessages(
               currentSession.id,
@@ -729,7 +731,7 @@ export default function App() {
                   // If fallback model was used, update model ID in session
                   setModelIdState(parsed.modelUsed);
                 }
-                if (parsed.thinkingChunk) {
+                if (parsed.thinkingChunk && capabilities.reasoning) {
                   accumulatedThinking += parsed.thinkingChunk;
                 }
                 if (parsed.sources && Array.isArray(parsed.sources)) {

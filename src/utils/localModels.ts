@@ -323,11 +323,16 @@ export function buildLocalChatMessages(
   messages: ChatMessage[],
   capabilities: ModelCapabilitiesConfig,
   secretPrompt?: string,
-  secretPromptEnabled?: boolean
+  secretPromptEnabled?: boolean,
+  modelId?: string
 ): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
   const formatted: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];
   const hasSecret = Boolean(secretPromptEnabled && secretPrompt && secretPrompt.trim().length > 0);
   const secretText = secretPrompt ? secretPrompt.trim() : '';
+  const reasoningEnabled = capabilities.reasoning !== false;
+  const depth = capabilities.thinkingLevel || 'high';
+  const lowerModel = (modelId || '').toLowerCase();
+  const isQwen3 = lowerModel.includes('qwen3');
 
   const systemParts: string[] = [];
   if (hasSecret) {
@@ -336,6 +341,21 @@ export function buildLocalChatMessages(
     );
   }
   systemParts.push(buildSystemDateInstruction(capabilities));
+
+  if (!reasoningEnabled) {
+    systemParts.push(
+      '[Reasoning Mode: OFF]: Answer directly and concisely without outputting <think> blocks or internal reasoning steps.'
+    );
+  } else {
+    const depthGuidance: Record<string, string> = {
+      low: '[Reasoning Depth: LOW]: Keep internal thinking brief and focused on quick verification before giving a direct answer.',
+      medium: '[Reasoning Depth: MEDIUM]: Think through the problem step by step with balanced analysis before giving your final answer.',
+      high: '[Reasoning Depth: HIGH]: Perform thorough, structured multi-step reasoning and verify edge cases before concluding.',
+      xhigh: '[Reasoning Depth: XHIGH]: Perform exhaustive, deep first-principles analysis, check assumptions and edge cases rigorously, and double-check all calculations before delivering your final answer.',
+    };
+    systemParts.push(depthGuidance[depth] || depthGuidance.high);
+  }
+
   if (capabilities.systemPrompt) {
     systemParts.push(capabilities.systemPrompt);
   }
@@ -375,6 +395,11 @@ export function buildLocalChatMessages(
 
     if (hasSecret && msg.role === 'user' && isLast) {
       textContent = `${textContent}\n\n[MANDATORY CONSTRAINT: ${secretText}]`;
+    }
+
+    // Qwen3 native soft-switch for enabling/disabling thinking mode
+    if (isQwen3 && msg.role === 'user' && isLast) {
+      textContent = reasoningEnabled ? `${textContent} /think` : `${textContent} /no_think`;
     }
 
     formatted.push({
@@ -495,24 +520,39 @@ export async function streamWebLLMChat(
       throw new DOMException('Aborted', 'AbortError');
     }
 
+    const reasoningEnabled = capabilities.reasoning !== false;
     const formattedMessages = buildLocalChatMessages(
       messages,
       capabilities,
       secretPrompt,
-      secretPromptEnabled
+      secretPromptEnabled,
+      modelId
     );
 
     const splitter = createThinkTagStreamSplitter(
       callbacks.onChunk,
-      (t) => callbacks.onThinkingChunk?.(t)
+      (t) => {
+        if (reasoningEnabled) callbacks.onThinkingChunk?.(t);
+      }
     );
+
+    const depthTokenCap =
+      !reasoningEnabled
+        ? 2048
+        : capabilities.thinkingLevel === 'xhigh'
+        ? 4096
+        : capabilities.thinkingLevel === 'high'
+        ? 3584
+        : capabilities.thinkingLevel === 'medium'
+        ? 2560
+        : 1536;
 
     const stream = await engine.chat.completions.create({
       messages: formattedMessages,
       stream: true,
       temperature: capabilities.temperature ?? 0.7,
       top_p: capabilities.topP ?? 0.95,
-      max_tokens: Math.min(capabilities.maxTokens || 2048, 4096),
+      max_tokens: Math.min(Math.max(capabilities.maxTokens || 2048, depthTokenCap), 4096),
     });
 
     for await (const chunk of stream) {
@@ -668,17 +708,21 @@ export async function streamLocalServerChat(
     signal,
   } = params;
 
+  const reasoningEnabled = capabilities.reasoning !== false;
   const { rootUrl, v1Url } = normalizeBaseUrls(endpointUrl);
   const formattedMessages = buildLocalChatMessages(
     messages,
     capabilities,
     secretPrompt,
-    secretPromptEnabled
+    secretPromptEnabled,
+    modelId
   );
 
   const splitter = createThinkTagStreamSplitter(
     callbacks.onChunk,
-    (t) => callbacks.onThinkingChunk?.(t)
+    (t) => {
+      if (reasoningEnabled) callbacks.onThinkingChunk?.(t);
+    }
   );
 
   const headers: Record<string, string> = {
@@ -688,26 +732,50 @@ export async function streamLocalServerChat(
     headers['Authorization'] = `Bearer ${apiKey.trim()}`;
   }
 
-  // Prefer Ollama native /api/chat when mode === 'ollama' or port 11434 (supports native thinking field + options)
+  // Prefer Ollama native /api/chat when mode === 'ollama' or port 11434 (supports native thinking field + think toggle)
   const useOllamaNative = mode === 'ollama' || (!endpointUrl.includes('/v1') && rootUrl.includes('11434'));
 
   if (useOllamaNative) {
     try {
-      const response = await fetch(`${rootUrl}/api/chat`, {
+      const lowerLocalModel = modelId.toLowerCase();
+      const thinkParam: boolean | string = !reasoningEnabled
+        ? false
+        : lowerLocalModel.includes('gpt-oss')
+        ? capabilities.thinkingLevel === 'xhigh'
+          ? 'high'
+          : capabilities.thinkingLevel || 'medium'
+        : true;
+
+      const ollamaPayload: any = {
+        model: modelId,
+        messages: formattedMessages,
+        stream: true,
+        think: thinkParam,
+        options: {
+          temperature: capabilities.temperature ?? 0.7,
+          top_p: capabilities.topP ?? 0.95,
+          num_predict: capabilities.maxTokens ?? 4096,
+        },
+      };
+
+      let response = await fetch(`${rootUrl}/api/chat`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          model: modelId,
-          messages: formattedMessages,
-          stream: true,
-          options: {
-            temperature: capabilities.temperature ?? 0.7,
-            top_p: capabilities.topP ?? 0.95,
-            num_predict: capabilities.maxTokens ?? 4096,
-          },
-        }),
+        body: JSON.stringify(ollamaPayload),
         signal,
       });
+
+      // Older Ollama versions or non-thinking models may reject the `think` field with HTTP 400
+      if (!response.ok && response.status === 400) {
+        const fallbackPayload = { ...ollamaPayload };
+        delete fallbackPayload.think;
+        response = await fetch(`${rootUrl}/api/chat`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(fallbackPayload),
+          signal,
+        });
+      }
 
       if (response.ok && response.body) {
         const reader = response.body.getReader();
@@ -729,7 +797,7 @@ export async function streamLocalServerChat(
               if (parsed.error) {
                 throw new Error(parsed.error);
               }
-              if (parsed.message?.thinking) {
+              if (parsed.message?.thinking && reasoningEnabled) {
                 callbacks.onThinkingChunk?.(parsed.message.thinking);
               }
               if (parsed.message?.content) {
@@ -797,7 +865,7 @@ export async function streamLocalServerChat(
         const delta = parsed.choices?.[0]?.delta;
         if (delta) {
           const reasoning = delta.reasoning_content || delta.reasoning || '';
-          if (reasoning) callbacks.onThinkingChunk?.(reasoning);
+          if (reasoning && reasoningEnabled) callbacks.onThinkingChunk?.(reasoning);
           if (delta.content) splitter.push(delta.content);
         }
       } catch {}

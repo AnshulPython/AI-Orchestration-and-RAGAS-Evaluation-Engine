@@ -82,10 +82,12 @@ export interface VoiceConfig {
   nativeSampleText?: string;
 }
 
+export type ThinkingDepth = 'low' | 'medium' | 'high' | 'xhigh';
+
 export interface ModelCapabilitiesConfig {
   webSearch: boolean;
   reasoning: boolean;
-  thinkingLevel: 'minimal' | 'low' | 'high';
+  thinkingLevel: ThinkingDepth;
   codeExecution: boolean;
   visionEnabled: boolean;
   ttsEnabled: boolean;
@@ -142,6 +144,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   thinking?: string; // Step-by-step reasoning trace
+  thinkingDepthUsed?: ThinkingDepth | 'off';
   sources?: Array<{ title: string; url: string }>;
   timestamp: number;
   modelUsed?: string;

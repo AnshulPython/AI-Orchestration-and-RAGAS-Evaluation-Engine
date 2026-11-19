@@ -58,6 +58,7 @@ import {
   ModelCapabilitiesConfig,
   VoiceConfig,
   ThemeMode,
+  ThinkingDepth,
 } from '../types';
 import { AI_PROVIDERS } from '../data/providersAndModels';
 import { MarkdownRenderer } from './MarkdownRenderer';
@@ -167,6 +168,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [showToolsBar, setShowToolsBar] = useState(false);
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
   const [isDateMenuOpen, setIsDateMenuOpen] = useState(false);
+  const [isThinkingMenuOpen, setIsThinkingMenuOpen] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -174,6 +176,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const themeMenuRef = useRef<HTMLDivElement>(null);
   const dateMenuRef = useRef<HTMLDivElement>(null);
+  const thinkingMenuRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef<boolean>(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -224,12 +227,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       if (dateMenuRef.current && !dateMenuRef.current.contains(target)) {
         setIsDateMenuOpen(false);
       }
+      if (thinkingMenuRef.current && !thinkingMenuRef.current.contains(target)) {
+        setIsThinkingMenuOpen(false);
+      }
     };
-    if (isMoreMenuOpen || isThemeMenuOpen || isDateMenuOpen) {
+    if (isMoreMenuOpen || isThemeMenuOpen || isDateMenuOpen || isThinkingMenuOpen) {
       document.addEventListener('mousedown', handleOutside);
       return () => document.removeEventListener('mousedown', handleOutside);
     }
-  }, [isMoreMenuOpen, isThemeMenuOpen, isDateMenuOpen]);
+  }, [isMoreMenuOpen, isThemeMenuOpen, isDateMenuOpen, isThinkingMenuOpen]);
 
   // Subscribe to speech synthesis state updates
   useEffect(() => {
@@ -351,10 +357,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     });
   };
 
-  const toggleThinking = (id: string) => {
+  const toggleThinking = (id: string, currentlyOpen: boolean) => {
     setExpandedThinking((prev) => ({
       ...prev,
-      [id]: !prev[id],
+      [id]: !currentlyOpen,
     }));
   };
 
@@ -920,7 +926,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           const isUser = message.role === 'user';
           const isAssistant = message.role === 'assistant';
           const hasThinking = Boolean(message.thinking && message.thinking.trim());
-          const isThinkingOpen = expandedThinking[message.id] ?? false;
+          const isActivelyThinking = Boolean(message.isStreaming && hasThinking && !message.content);
+          const isThinkingOpen = expandedThinking[message.id] ?? isActivelyThinking;
 
           const isThisSpeaking = activeSpeechMessageId === message.id;
 
@@ -1032,12 +1039,26 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 {isAssistant && hasThinking && (
                   <div className="w-full rounded-xl bg-[#1e1f20] border border-[#2d2f31] overflow-hidden">
                     <button
-                      onClick={() => toggleThinking(message.id)}
-                      className="w-full px-3 py-2 flex items-center justify-between text-xs text-[#8e918f] hover:text-[#c4c7c5] transition-colors"
+                      type="button"
+                      onClick={() => toggleThinking(message.id, isThinkingOpen)}
+                      className="w-full px-3 py-2 flex items-center justify-between text-xs text-[#8e918f] hover:text-[#c4c7c5] transition-colors cursor-pointer"
                     >
                       <span className="flex items-center gap-1.5 font-medium">
-                        <Brain className="w-3.5 h-3.5 text-[#8ab4f8]" />
-                        Thought process
+                        <Brain
+                          className={`w-3.5 h-3.5 text-[#8ab4f8] ${
+                            isActivelyThinking ? 'animate-pulse' : ''
+                          }`}
+                        />
+                        <span>{isActivelyThinking ? 'Thinking...' : 'Thought process'}</span>
+                        {message.thinkingDepthUsed && message.thinkingDepthUsed !== 'off' && (
+                          <span className="px-1.5 py-0.5 rounded bg-[#282a2c] border border-[#3c4043] text-[10px] font-mono uppercase text-[#8ab4f8]">
+                            {message.thinkingDepthUsed === 'medium'
+                              ? 'Med'
+                              : message.thinkingDepthUsed === 'xhigh'
+                              ? 'XHigh'
+                              : message.thinkingDepthUsed}
+                          </span>
+                        )}
                       </span>
                       {isThinkingOpen ? (
                         <ChevronUp className="w-3.5 h-3.5" />
@@ -1046,7 +1067,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       )}
                     </button>
                     {isThinkingOpen && (
-                      <div className="px-3.5 pb-3 text-xs text-[#8e918f] font-mono whitespace-pre-wrap leading-relaxed border-t border-[#2d2f31] pt-2">
+                      <div className="px-3.5 pb-3 text-xs text-[#8e918f] font-mono whitespace-pre-wrap leading-relaxed border-t border-[#2d2f31] pt-2 max-h-72 overflow-y-auto">
                         {message.thinking}
                       </div>
                     )}
@@ -1513,23 +1534,139 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 >
                   <Globe className="w-4 h-4" />
                 </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    onChangeCapabilities({
-                      ...capabilities,
-                      reasoning: !capabilities.reasoning,
-                    })
-                  }
-                  className={`min-h-[40px] min-w-[40px] flex items-center justify-center p-2 rounded-full active:scale-95 touch-manipulation transition-all ${
-                    capabilities.reasoning
-                      ? 'text-[#8ab4f8] bg-[#282a2c]'
-                      : 'text-[#8e918f] hover:text-[#e3e3e3] hover:bg-[#282a2c]'
-                  }`}
-                  title={`Thinking: ${capabilities.reasoning ? 'ON' : 'OFF'}`}
-                >
-                  <Brain className="w-4 h-4" />
-                </button>
+                {/* Thinking Steps & Depth Control Popover */}
+                <div className="relative" ref={thinkingMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsThinkingMenuOpen((prev) => !prev)}
+                    className={`min-h-[38px] flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium active:scale-95 touch-manipulation transition-all cursor-pointer ${
+                      capabilities.reasoning
+                        ? 'text-[#8ab4f8] bg-[#282a2c] border border-[#3c4043]'
+                        : 'text-[#8e918f] hover:text-[#e3e3e3] hover:bg-[#282a2c]'
+                    }`}
+                    title={
+                      capabilities.reasoning
+                        ? `Thinking Steps: ON (${(capabilities.thinkingLevel || 'high').toUpperCase()}). Click to adjust depth or disable.`
+                        : 'Thinking Steps: OFF. Click to enable or select depth.'
+                    }
+                  >
+                    <Brain className="w-4 h-4 shrink-0" />
+                    <span className="text-[11px] font-medium">
+                      {capabilities.reasoning
+                        ? capabilities.thinkingLevel === 'low'
+                          ? 'Low'
+                          : capabilities.thinkingLevel === 'medium'
+                          ? 'Med'
+                          : capabilities.thinkingLevel === 'xhigh'
+                          ? 'XHigh'
+                          : 'High'
+                        : 'Off'}
+                    </span>
+                    <ChevronDown className="w-3 h-3 opacity-70 shrink-0" />
+                  </button>
+
+                  {isThinkingMenuOpen && (
+                    <div className="absolute bottom-full left-0 mb-2 w-72 rounded-2xl bg-[#1e1f20] border border-[#2d2f31] shadow-2xl p-3.5 z-50 space-y-3 animate-in fade-in duration-150">
+                      {/* Enable / Disable Thinking Steps Toggle */}
+                      <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[#2d2f31]">
+                        <div className="flex items-center gap-2">
+                          <Brain className="w-4 h-4 text-[#8ab4f8]" />
+                          <div>
+                            <div className="text-xs font-semibold text-[#e3e3e3]">
+                              Thinking Steps
+                            </div>
+                            <div className="text-[10px] text-[#8e918f]">
+                              {capabilities.reasoning
+                                ? 'Show step-by-step reasoning'
+                                : 'Disabled — direct answers'}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={capabilities.reasoning}
+                          onClick={() =>
+                            onChangeCapabilities({
+                              ...capabilities,
+                              reasoning: !capabilities.reasoning,
+                            })
+                          }
+                          className={`w-9 h-5 rounded-full p-0.5 transition-colors shrink-0 cursor-pointer flex items-center ${
+                            capabilities.reasoning ? 'bg-[#8ab4f8]' : 'bg-[#3c4043]'
+                          }`}
+                        >
+                          <div
+                            className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                              capabilities.reasoning ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Thinking Depth Selector */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-[#8e918f] font-medium">
+                          <span>Thinking Depth</span>
+                          <span className="font-mono text-[#8ab4f8]">
+                            {capabilities.reasoning
+                              ? (capabilities.thinkingLevel || 'high').toUpperCase()
+                              : 'OFF'}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-[#131314] border border-[#2d2f31]">
+                          {(
+                            [
+                              { id: 'low' as ThinkingDepth, label: 'Low', hint: 'Fast, light verification' },
+                              { id: 'medium' as ThinkingDepth, label: 'Med', hint: 'Balanced depth & speed' },
+                              { id: 'high' as ThinkingDepth, label: 'High', hint: 'Deep multi-step reasoning' },
+                              { id: 'xhigh' as ThinkingDepth, label: 'XHigh', hint: 'Maximum exhaustive depth' },
+                            ] as const
+                          ).map((opt) => {
+                            const isSelected =
+                              capabilities.reasoning &&
+                              (capabilities.thinkingLevel || 'high') === opt.id;
+                            return (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() =>
+                                  onChangeCapabilities({
+                                    ...capabilities,
+                                    reasoning: true,
+                                    thinkingLevel: opt.id,
+                                  })
+                                }
+                                className={`py-1.5 px-1 rounded-lg text-[11px] font-medium transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-[#8ab4f8] text-[#131314] font-semibold shadow-xs'
+                                    : 'text-[#8e918f] hover:text-[#e3e3e3] hover:bg-[#282a2c]'
+                                }`}
+                                title={opt.hint}
+                              >
+                                {opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <p className="text-[10px] text-[#8e918f] leading-relaxed pt-0.5">
+                          {!capabilities.reasoning
+                            ? 'Thinking steps are turned off. Click any depth above or toggle the switch to re-enable.'
+                            : capabilities.thinkingLevel === 'low'
+                            ? 'Low: Fastest responses with brief verification.'
+                            : capabilities.thinkingLevel === 'medium'
+                            ? 'Medium: Balanced reasoning depth and latency.'
+                            : capabilities.thinkingLevel === 'xhigh'
+                            ? activeModelId === 'gemini-4-neon' ||
+                              activeModelId === 'gemini-4-hydrogen'
+                              ? 'XHigh: Native maximum reasoning depth active.'
+                              : 'XHigh: Maximum budget (auto-clamps to High if model caps at High).'
+                            : 'High: Deep multi-step reasoning for complex prompts.'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={() => setIsVoicePopoverOpen(true)}

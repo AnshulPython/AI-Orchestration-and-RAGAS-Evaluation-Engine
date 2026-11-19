@@ -21,7 +21,7 @@ import {
   Calendar,
   Clock,
 } from 'lucide-react';
-import { ModelCapabilitiesConfig, ThemeMode } from '../types';
+import { ModelCapabilitiesConfig, ThemeMode, ThinkingDepth } from '../types';
 import { DEFAULT_CAPABILITIES, SYSTEM_PRESETS } from '../data/providersAndModels';
 
 interface CapabilitiesSettingsModalProps {
@@ -310,6 +310,163 @@ export const CapabilitiesSettingsModal: React.FC<CapabilitiesSettingsModalProps>
                       config.ttsEnabled ? 'translate-x-4' : 'translate-x-0'
                     }`}
                   />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 1.5: Thinking Steps & Depth Control */}
+          <div className="space-y-3 pt-4 border-t border-[#2d2f31]">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-medium uppercase tracking-wider text-[#8e918f] flex items-center gap-1.5">
+                <Brain className="w-3.5 h-3.5 text-[#8ab4f8]" />
+                <span>Thinking Steps &amp; Depth</span>
+              </div>
+              <span className="text-[11px] font-mono text-[#8ab4f8]">
+                {config.reasoning
+                  ? `Active · ${(config.thinkingLevel || 'high').toUpperCase()}`
+                  : 'Disabled (Direct Answer)'}
+              </span>
+            </div>
+
+            <div className="p-4 rounded-xl bg-[#131314] border border-[#2d2f31] space-y-4">
+              {/* Master Enable / Disable Toggle */}
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-medium text-[#e3e3e3]">
+                    Enable Thinking Steps
+                  </div>
+                  <p className="text-[11px] text-[#8e918f] mt-0.5">
+                    When enabled, the model streams structured chain-of-thought reasoning before answering. Turn off for faster direct answers without thinking steps.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={config.reasoning}
+                  onClick={() => updateSetting('reasoning', !config.reasoning)}
+                  className={`w-10 h-5.5 rounded-full p-0.5 transition-colors shrink-0 cursor-pointer flex items-center ${
+                    config.reasoning ? 'bg-[#8ab4f8]' : 'bg-[#3c4043]'
+                  }`}
+                  title={config.reasoning ? 'Disable thinking steps' : 'Enable thinking steps'}
+                >
+                  <div
+                    className={`w-4.5 h-4.5 rounded-full bg-white transition-transform ${
+                      config.reasoning ? 'translate-x-4.5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* 4-Level Thinking Depth Selector */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-medium text-[#c4c7c5]">
+                    Thinking Depth
+                  </span>
+                  {!config.reasoning && (
+                    <span className="text-[10px] text-[#8e918f]">
+                      Click any depth to re-enable thinking steps
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {(
+                    [
+                      {
+                        id: 'low' as ThinkingDepth,
+                        label: 'Low',
+                        sub: 'Fast & concise',
+                        budget: 'Light check',
+                      },
+                      {
+                        id: 'medium' as ThinkingDepth,
+                        label: 'Medium',
+                        sub: 'Balanced depth',
+                        budget: 'Standard CoT',
+                      },
+                      {
+                        id: 'high' as ThinkingDepth,
+                        label: 'High',
+                        sub: 'Deep analysis',
+                        budget: 'Multi-step',
+                      },
+                      {
+                        id: 'xhigh' as ThinkingDepth,
+                        label: 'XHigh',
+                        sub: 'Max reasoning',
+                        budget: 'Exhaustive',
+                      },
+                    ] as const
+                  ).map((level) => {
+                    const isSelected = config.reasoning && (config.thinkingLevel || 'high') === level.id;
+                    return (
+                      <button
+                        key={level.id}
+                        type="button"
+                        onClick={() =>
+                          updateSettings({
+                            reasoning: true,
+                            thinkingLevel: level.id,
+                          })
+                        }
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer touch-manipulation active:scale-[0.98] ${
+                          isSelected
+                            ? 'bg-[#282a2c] border-[#8ab4f8] ring-1 ring-[#8ab4f8]/30 shadow-sm'
+                            : config.reasoning
+                            ? 'bg-[#1e1f20] hover:bg-[#282a2c]/60 border-[#2d2f31]'
+                            : 'bg-[#1e1f20]/50 hover:bg-[#282a2c]/50 border-[#2d2f31] opacity-60 hover:opacity-100'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-1">
+                          <span
+                            className={`text-xs font-semibold ${
+                              isSelected ? 'text-[#8ab4f8]' : 'text-[#e3e3e3]'
+                            }`}
+                          >
+                            {level.label}
+                          </span>
+                          <span className="text-[9px] font-mono text-[#8e918f]">
+                            {level.budget}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-[#8e918f] mt-1">
+                          {level.sub}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Model Compatibility Hint */}
+                <div className="text-[11px] bg-[#1e1f20] px-3 py-2 rounded-lg border border-[#2d2f31] text-[#9aa0a6]">
+                  <span className="text-[#8ab4f8] font-medium">Model behavior ({activeModelId}): </span>
+                  {activeModelId === 'gemini-4-neon' || activeModelId === 'gemini-4-hydrogen'
+                    ? config.reasoning
+                      ? 'Supports native Low, Medium, High, and XHigh thinking levels with live streamed thoughts.'
+                      : 'Runs at lowest-latency Low level with thought traces suppressed.'
+                    : activeModelId.startsWith('gemini-4')
+                    ? config.reasoning
+                      ? 'Supports native Low, Medium, and High thinking levels (XHigh auto-clamps to High).'
+                      : 'Runs at lowest-latency Low level with thought traces suppressed.'
+                    : activeModelId.includes('gemini-3')
+                    ? config.reasoning
+                      ? 'Supports native Low, Medium, and High thinking levels (XHigh maps to High).'
+                      : 'Sets native ThinkingLevel.MINIMAL (no thinking) with thought traces off.'
+                    : activeModelId.includes('claude')
+                    ? config.reasoning
+                      ? 'Maps depth to Anthropic extended thinking budget (1k / 4k / 10k / 24k tokens).'
+                      : 'Disables Anthropic extended thinking block.'
+                    : activeModelId.startsWith('o1') ||
+                      activeModelId.startsWith('o3') ||
+                      activeModelId.startsWith('o4') ||
+                      activeModelId.startsWith('gpt-5')
+                    ? config.reasoning
+                      ? 'Maps depth directly to OpenAI reasoning_effort parameter.'
+                      : 'Uses minimal/low reasoning effort for fastest replies.'
+                    : config.reasoning
+                    ? 'Applies native provider reasoning effort / thinking budget and parses <think> traces.'
+                    : 'Disables thinking flags (think: false / /no_think) and hides reasoning traces.'}
                 </div>
               </div>
             </div>

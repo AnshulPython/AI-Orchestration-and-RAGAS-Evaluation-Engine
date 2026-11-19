@@ -289,7 +289,18 @@ export function getCapabilitiesConfig(): ModelCapabilitiesConfig {
   try {
     const raw = localStorage.getItem(CAPABILITIES_STORAGE_KEY);
     if (raw) {
-      return { ...DEFAULT_CAPABILITIES, ...JSON.parse(raw) };
+      const parsed = JSON.parse(raw);
+      const merged: ModelCapabilitiesConfig = { ...DEFAULT_CAPABILITIES, ...parsed };
+      const rawLevel = String((parsed as any).thinkingLevel || merged.thinkingLevel || 'high').toLowerCase();
+      if (rawLevel === 'minimal' || rawLevel === 'off' || rawLevel === 'none') {
+        merged.reasoning = false;
+        merged.thinkingLevel = 'low';
+      } else if (rawLevel === 'low' || rawLevel === 'medium' || rawLevel === 'high' || rawLevel === 'xhigh') {
+        merged.thinkingLevel = rawLevel;
+      } else {
+        merged.thinkingLevel = DEFAULT_CAPABILITIES.thinkingLevel;
+      }
+      return merged;
     }
   } catch {}
   return DEFAULT_CAPABILITIES;

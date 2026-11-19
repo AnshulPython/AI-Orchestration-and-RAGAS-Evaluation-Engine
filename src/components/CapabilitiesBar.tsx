@@ -64,20 +64,63 @@ export const CapabilitiesBar: React.FC<CapabilitiesBarProps> = ({
         <span>Search</span>
       </button>
 
-      {/* Deep Thinking / Reasoning */}
-      <button
-        type="button"
-        onClick={() => toggle('reasoning')}
-        className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors shrink-0 ${
+      {/* Deep Thinking / Reasoning Toggle + Depth Selector */}
+      <div
+        className={`flex items-center rounded-full border transition-colors shrink-0 ${
           config.reasoning
-            ? 'bg-[#282a2c] text-[#8ab4f8] border border-[#3c4043]'
-            : 'text-[#8e918f] hover:text-[#c4c7c5] hover:bg-[#282a2c]/50'
+            ? 'bg-[#282a2c] border-[#3c4043]'
+            : 'border-transparent hover:bg-[#282a2c]/50'
         }`}
-        title="Toggle step-by-step thinking & reasoning traces"
       >
-        <Brain className="w-3.5 h-3.5" />
-        <span>Thinking</span>
-      </button>
+        <button
+          type="button"
+          onClick={() => toggle('reasoning')}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+            config.reasoning
+              ? 'text-[#8ab4f8]'
+              : 'text-[#8e918f] hover:text-[#c4c7c5]'
+          }`}
+          title={config.reasoning ? 'Disable thinking steps' : 'Enable thinking steps'}
+        >
+          <Brain className="w-3.5 h-3.5" />
+          <span>{config.reasoning ? 'Thinking' : 'Thinking: Off'}</span>
+        </button>
+        {config.reasoning && (
+          <div className="flex items-center gap-0.5 pr-1 pl-0.5 border-l border-[#3c4043]">
+            {(
+              [
+                { id: 'low', label: 'Low' },
+                { id: 'medium', label: 'Med' },
+                { id: 'high', label: 'High' },
+                { id: 'xhigh', label: 'XHigh' },
+              ] as const
+            ).map((opt) => {
+              const active = (config.thinkingLevel || 'high') === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() =>
+                    onChangeConfig({
+                      ...config,
+                      reasoning: true,
+                      thinkingLevel: opt.id,
+                    })
+                  }
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium transition-colors cursor-pointer ${
+                    active
+                      ? 'bg-[#8ab4f8] text-[#131314]'
+                      : 'text-[#8e918f] hover:text-[#e3e3e3] hover:bg-[#333538]'
+                  }`}
+                  title={`Set thinking depth to ${opt.label}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Code Sandbox */}
       <button
