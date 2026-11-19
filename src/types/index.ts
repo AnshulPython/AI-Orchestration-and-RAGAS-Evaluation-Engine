@@ -66,6 +66,8 @@ export interface AIModel {
   localRuntime?: LocalRuntimeMode;
   sizeLabel?: string;
   vramRequiredMB?: number;
+  createdAt?: number;
+  isLiveSynced?: boolean;
 }
 
 export interface VoiceConfig {

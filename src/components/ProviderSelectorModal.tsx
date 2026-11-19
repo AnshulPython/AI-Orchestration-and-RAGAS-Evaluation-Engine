@@ -44,6 +44,7 @@ interface ProviderSelectorModalProps {
   onClose: () => void;
   activeProvider: AIProviderId;
   onProviderChanged: (providerId: AIProviderId) => void;
+  onKeysUpdated?: () => void;
   hasGeminiEnvKey?: boolean;
 }
 
@@ -52,6 +53,7 @@ export const ProviderSelectorModal: React.FC<ProviderSelectorModalProps> = ({
   onClose,
   activeProvider,
   onProviderChanged,
+  onKeysUpdated,
   hasGeminiEnvKey = false,
 }) => {
   const [selectedProvider, setSelectedProvider] = useState<AIProviderId>(activeProvider);
@@ -200,6 +202,7 @@ export const ProviderSelectorModal: React.FC<ProviderSelectorModalProps> = ({
         setStoredKeys(updated);
         setActiveProvider(selectedProvider);
         onProviderChanged(selectedProvider);
+        onKeysUpdated?.();
         try {
           confetti({
             particleCount: 80,
@@ -234,6 +237,7 @@ export const ProviderSelectorModal: React.FC<ProviderSelectorModalProps> = ({
     clearStoredApiKey(selectedProvider);
     setStoredKeys(getStoredApiKeys());
     setKeyInput('');
+    onKeysUpdated?.();
     setValidationStatus({
       success: true,
       message: `Cleared saved credentials for ${currentProviderInfo.name}`,

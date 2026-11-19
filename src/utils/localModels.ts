@@ -70,6 +70,99 @@ export function isWebLLMModelId(modelId: string): boolean {
   return prebuiltAppConfig.model_list.some((m) => m.model_id === modelId);
 }
 
+/**
+ * Dynamically builds an up-to-date WebGPU local model catalog directly from
+ * @mlc-ai/web-llm's prebuiltAppConfig.model_list, preserving curated descriptions
+ * and surfacing any newer models bundled in the WebLLM registry.
+ */
+export function getUpToDateWebGPUModels(curatedWebGPUModels: AIModel[]): AIModel[] {
+  const curatedMap = new Map<string, AIModel>(
+    curatedWebGPUModels.map((m) => [m.id, { ...m, isLiveSynced: true }])
+  );
+  const prebuiltIds = new Set(prebuiltAppConfig.model_list.map((m) => m.model_id));
+
+  // Keep curated models that actually exist in the current prebuilt registry (or fallback if empty)
+  const merged: AIModel[] = [];
+  for (const cur of curatedWebGPUModels) {
+    if (prebuiltIds.size === 0 || prebuiltIds.has(cur.id)) {
+      const prebuiltMatch = prebuiltAppConfig.model_list.find((p) => p.model_id === cur.id);
+      merged.push({
+        ...cur,
+        vramRequiredMB: prebuiltMatch?.vram_required_MB ?? cur.vramRequiredMB,
+        isLiveSynced: true,
+      });
+    }
+  }
+
+  // Dynamically discover additional up-to-date chat models from prebuiltAppConfig
+  // Prefer q4f16_1 quantizations and skip embedding / legacy / tiny context variants
+  const seenFamilies = new Set(
+    merged.map((m) => m.id.replace(/-q\d+f\d+_\d+-MLC.*$/, '').toLowerCase())
+  );
+
+  const preferredPrefixes = [
+    'Qwen3-',
+    'Qwen2.5-',
+    'gemma-4',
+    'gemma3-',
+    'gemma-3',
+    'Phi-4',
+    'Llama-3.3',
+    'Llama-3.2',
+    'DeepSeek-R1',
+    'SmolLM2-',
+    'Mistral-',
+  ];
+
+  const extraCandidates = prebuiltAppConfig.model_list.filter((entry) => {
+    const id = entry.model_id;
+    if (!id.includes('-q4f16_1-MLC')) return false;
+    if (id.includes('-1k') || id.includes('embed') || id.includes('RedPajama') || id.includes('WizardMath')) {
+      return false;
+    }
+    if (curatedMap.has(id)) return false;
+    const familyKey = id.replace(/-q\d+f\d+_\d+-MLC.*$/, '').toLowerCase();
+    if (seenFamilies.has(familyKey)) return false;
+    return preferredPrefixes.some((prefix) => id.startsWith(prefix));
+  });
+
+  for (const entry of extraCandidates.slice(0, 14)) {
+    const id = entry.model_id;
+    const familyKey = id.replace(/-q\d+f\d+_\d+-MLC.*$/, '').toLowerCase();
+    seenFamilies.add(familyKey);
+
+    const ctx = entry.overrides?.context_window_size;
+    const vramMB = entry.vram_required_MB || 2000;
+    const isReasoning =
+      id.includes('R1') ||
+      id.includes('Qwen3') ||
+      id.includes('Phi-4') ||
+      id.includes('gemma-4');
+    const cleanName = id
+      .replace(/-q\d+f\d+_\d+-MLC.*$/, '')
+      .replace(/-/g, ' ');
+
+    merged.push({
+      id,
+      name: `${cleanName} (WebGPU)`,
+      provider: 'local',
+      description: `Live WebLLM registry model running 100% locally in your browser via WebGPU (~${(vramMB / 1000).toFixed(1)} GB VRAM).`,
+      contextWindow: ctx ? `${Math.round(ctx / 1024)}k tokens` : '32k tokens',
+      capabilities: isReasoning ? ['reasoning', 'codeExecution'] : ['fastSpeed', 'codeExecution'],
+      minPlanTier: 'free',
+      supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
+      speed: vramMB < 1800 ? 'Ultra-Fast' : vramMB < 3200 ? 'Fast' : 'Balanced',
+      intelligenceLevel: vramMB >= 3500 ? 'Maximum' : 'Very High',
+      localRuntime: 'webgpu',
+      sizeLabel: `~${(vramMB / 1000).toFixed(1)} GB VRAM`,
+      vramRequiredMB: vramMB,
+      isLiveSynced: true,
+    });
+  }
+
+  return merged;
+}
+
 export async function getCachedWebLLMModels(modelIds: string[]): Promise<Record<string, boolean>> {
   const result: Record<string, boolean> = {};
   await Promise.all(

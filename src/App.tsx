@@ -46,6 +46,7 @@ import { VoiceSelectorPopover } from './components/VoiceSelectorPopover';
 import { speakMessage, getStoredVoiceConfig, saveStoredVoiceConfig } from './utils/speech';
 import {
   discoverLocalServerModels,
+  getUpToDateWebGPUModels,
   isWebLLMModelId,
   streamLocalServerChat,
   streamWebLLMChat,
@@ -60,6 +61,12 @@ export default function App() {
   const [accountChecked, setAccountChecked] = useState<boolean>(false);
   const [totalAccountModels, setTotalAccountModels] = useState<number>(0);
   const [isRefreshingModels, setIsRefreshingModels] = useState<boolean>(false);
+  const [modelsLastUpdated, setModelsLastUpdated] = useState<number | null>(null);
+  const [modelsSource, setModelsSource] = useState<string | null>(null);
+  const activeProviderRef = useRef<AIProviderId>(provider);
+  const modelsLastUpdatedRef = useRef<number | null>(null);
+  activeProviderRef.current = provider;
+  modelsLastUpdatedRef.current = modelsLastUpdated;
   const [capabilities, setCapabilitiesState] = useState<ModelCapabilitiesConfig>(
     getCapabilitiesConfig()
   );
@@ -124,12 +131,11 @@ export default function App() {
     const apiKey = keys[targetProvider] || '';
     const customBaseUrl = keys.customBaseUrl;
     const plan = getProviderPlan(targetProvider);
-    const onlyAvailable = getFilterOnlyAvailableModels();
 
     try {
       if (targetProvider === 'local') {
         const localCfg = getLocalRuntimeConfig();
-        const webgpuModels = PROVIDER_MODELS.local || [];
+        const webgpuModels = getUpToDateWebGPUModels(PROVIDER_MODELS.local || []);
         let combinedModels = [...webgpuModels];
         let checked = true;
 
@@ -141,9 +147,12 @@ export default function App() {
           }
         }
 
+        if (activeProviderRef.current !== 'local') return;
         setModels(combinedModels);
         setAccountChecked(checked);
         setTotalAccountModels(combinedModels.length);
+        setModelsLastUpdated(Date.now());
+        setModelsSource('api_live');
 
         const active = getActiveModel('local');
         if (!combinedModels.some((m) => m.id === active)) {
@@ -152,7 +161,7 @@ export default function App() {
             setModelIdState(recommended.id);
             setActiveModel('local', recommended.id);
           }
-        } else if (active !== modelId && targetProvider === provider) {
+        } else if (active !== modelId) {
           setModelIdState(active);
         }
         return;
@@ -166,26 +175,34 @@ export default function App() {
           apiKey,
           customBaseUrl,
           plan,
-          onlyAvailable,
+          onlyAvailable: false,
         }),
       });
       const data = await res.json();
+      if (activeProviderRef.current !== targetProvider) return;
       if (data.models && Array.isArray(data.models)) {
         setModels(data.models);
         setAccountChecked(Boolean(data.accountChecked));
         setTotalAccountModels(data.totalAccountModels || data.models.length);
+        setModelsLastUpdated(data.fetchedAt || Date.now());
+        setModelsSource(data.source || 'catalog');
 
-        if (!data.models.some((m: AIModel) => m.id === modelId)) {
+        const currentActive = getActiveModel(targetProvider);
+        if (!data.models.some((m: AIModel) => m.id === currentActive)) {
           const recommended = data.models.find((m: AIModel) => m.recommended) || data.models[0];
           if (recommended) {
             setModelIdState(recommended.id);
             setActiveModel(targetProvider, recommended.id);
           }
+        } else if (currentActive !== modelId) {
+          setModelIdState(currentActive);
         }
       }
     } catch {
+      if (activeProviderRef.current !== targetProvider) return;
       setModels(PROVIDER_MODELS[targetProvider] || []);
       setAccountChecked(false);
+      setModelsSource('catalog');
     } finally {
       setIsRefreshingModels(false);
     }
@@ -232,6 +249,41 @@ export default function App() {
 
   useEffect(() => {
     fetchAccountModels(provider);
+  }, [provider]);
+
+  // Automatically re-sync models when Model Selector opens (if > 30s old)
+  useEffect(() => {
+    if (isModelModalOpen) {
+      const last = modelsLastUpdatedRef.current;
+      const isStale = !last || Date.now() - last > 30000;
+      if (isStale) {
+        fetchAccountModels(provider);
+      }
+    }
+  }, [isModelModalOpen, provider]);
+
+  // Keep available models fresh on tab refocus and every 5 minutes
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        const last = modelsLastUpdatedRef.current;
+        if (!last || Date.now() - last > 120000) {
+          fetchAccountModels(provider);
+        }
+      }
+    };
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchAccountModels(provider);
+      }
+    }, 5 * 60 * 1000);
+    return () => {
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.clearInterval(interval);
+    };
   }, [provider]);
 
   const currentSession = sessions.find((s) => s.id === activeSessionId) || sessions[0];
@@ -895,6 +947,7 @@ export default function App() {
         onClose={() => setIsProviderModalOpen(false)}
         activeProvider={provider}
         onProviderChanged={handleProviderChanged}
+        onKeysUpdated={() => fetchAccountModels(provider)}
         hasGeminiEnvKey={hasGeminiEnvKey}
       />
 
@@ -915,6 +968,8 @@ export default function App() {
         isRefreshing={isRefreshingModels}
         accountChecked={accountChecked}
         totalAccountModels={totalAccountModels}
+        lastUpdated={modelsLastUpdated}
+        modelsSource={modelsSource}
       />
 
       {/* Capabilities & Settings Modal */}

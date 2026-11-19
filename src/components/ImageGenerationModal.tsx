@@ -305,18 +305,18 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setSelectedModel('gemini-3.1-flash-image')}
+                    onClick={() => setSelectedModel('gemini-nano-banana-2.1')}
                     className={`w-full px-2.5 py-1.5 rounded-lg text-left text-xs transition-colors flex items-center justify-between border cursor-pointer ${
-                      selectedModel === 'gemini-3.1-flash-image'
+                      selectedModel === 'gemini-nano-banana-2.1'
                         ? 'bg-[#282a2c] text-white border-[#c58af9]'
                         : 'bg-[#131314] text-[#8e918f] border-[#2d2f31]'
                     }`}
                   >
                     <div>
-                      <div className="font-medium text-[#e3e3e3]">Flash Image (HQ)</div>
-                      <div className="text-[10px] text-[#8e918f]">High quality details & textures</div>
+                      <div className="font-medium text-[#e3e3e3]">Nano Banana 2.1 (HQ)</div>
+                      <div className="text-[10px] text-[#8e918f]">High quality 1K–4K details & textures</div>
                     </div>
-                    {selectedModel === 'gemini-3.1-flash-image' && (
+                    {selectedModel === 'gemini-nano-banana-2.1' && (
                       <Check className="w-3.5 h-3.5 text-[#c58af9]" />
                     )}
                   </button>

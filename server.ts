@@ -16,6 +16,19 @@ const envGeminiKey = (process.env.GEMINI_API_KEY || '').trim();
 const PROVIDER_MODELS: Record<string, any[]> = {
   gemini: [
     {
+      id: 'gemini-4-hydrogen',
+      name: 'Gemini 4 Hydrogen',
+      provider: 'gemini',
+      description: 'Latest-generation fast flagship Gemini model. High speed, balanced intelligence, and multimodal reasoning.',
+      contextWindow: '1,000,000 tokens',
+      capabilities: ['reasoning', 'webSearch', 'fastSpeed', 'jsonMode', 'codeExecution', 'vision'],
+      recommended: true,
+      minPlanTier: 'free',
+      supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
+      speed: 'Ultra-Fast',
+      intelligenceLevel: 'Very High',
+    },
+    {
       id: 'gemini-3.1-flash-lite',
       name: 'Gemini 3.1 Flash Lite',
       provider: 'gemini',
@@ -29,28 +42,43 @@ const PROVIDER_MODELS: Record<string, any[]> = {
       intelligenceLevel: 'Very High',
     },
     {
-      id: 'gemini-3.8-flash',
-      name: 'Gemini 3.8 Flash',
+      id: 'gemini-4-neon',
+      name: 'Gemini 4 Neon',
       provider: 'gemini',
-      description: 'Google flagship multimodal model. Superb for general chat, coding, and reasoning (subject to free tier rate limits).',
-      contextWindow: '1,000,000 tokens',
-      capabilities: ['reasoning', 'webSearch', 'codeExecution', 'vision', 'tts', 'jsonMode', 'fastSpeed'],
-      minPlanTier: 'free',
-      supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
-      speed: 'Ultra-Fast',
-      intelligenceLevel: 'Very High',
+      description: 'Complex reasoning, coding, math, and STEM flagship in the Gemini 4 family.',
+      contextWindow: '2,000,000 tokens',
+      capabilities: ['reasoning', 'webSearch', 'codeExecution', 'vision', 'jsonMode'],
+      minPlanTier: 'tier1',
+      supportedPlans: ['tier1', 'pro', 'enterprise'],
+      isPaid: true,
+      speed: 'Balanced',
+      intelligenceLevel: 'Maximum',
     },
     {
-      id: 'gemini-flash-latest',
-      name: 'Gemini Flash (Latest Stable)',
+      id: 'gemini-4-carbon',
+      name: 'Gemini 4 Carbon',
       provider: 'gemini',
-      description: 'General-purpose high-speed Gemini Flash model with balanced quota distribution.',
-      contextWindow: '1,000,000 tokens',
-      capabilities: ['webSearch', 'fastSpeed', 'jsonMode', 'codeExecution', 'vision'],
-      minPlanTier: 'free',
-      supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
-      speed: 'Ultra-Fast',
-      intelligenceLevel: 'Very High',
+      description: 'Deep reasoning model built for root-cause debugging, architectural design, scientific proofs, and security auditing.',
+      contextWindow: '2,000,000 tokens',
+      capabilities: ['reasoning', 'webSearch', 'codeExecution', 'vision', 'jsonMode'],
+      minPlanTier: 'tier1',
+      supportedPlans: ['tier1', 'pro', 'enterprise'],
+      isPaid: true,
+      speed: 'Deep-Reasoning',
+      intelligenceLevel: 'Maximum',
+    },
+    {
+      id: 'gemini-4-argon',
+      name: 'Gemini 4 Argon',
+      provider: 'gemini',
+      description: 'High-precision Gemini 4 reasoning tier for specialized multi-step evaluation workflows.',
+      contextWindow: '2,000,000 tokens',
+      capabilities: ['reasoning', 'webSearch', 'codeExecution', 'vision', 'jsonMode'],
+      minPlanTier: 'pro',
+      supportedPlans: ['pro', 'enterprise'],
+      isPaid: true,
+      speed: 'Deep-Reasoning',
+      intelligenceLevel: 'Maximum',
     },
     {
       id: 'gemini-3.1-flash-lite-image',
@@ -66,10 +94,10 @@ const PROVIDER_MODELS: Record<string, any[]> = {
       intelligenceLevel: 'High',
     },
     {
-      id: 'gemini-3.1-flash-image',
-      name: 'Gemini 3.1 Flash Image (HQ)',
+      id: 'gemini-nano-banana-2.1',
+      name: 'Gemini Nano Banana 2.1 (HQ Image)',
       provider: 'gemini',
-      description: 'Flagship high-quality image generation (up to 4K resolution) and multimodal creation.',
+      description: 'Flagship high-quality image generation and editing supporting up to 4K resolution.',
       contextWindow: '128,000 tokens',
       capabilities: ['imageGeneration', 'vision', 'webSearch'],
       minPlanTier: 'tier1',
@@ -79,38 +107,74 @@ const PROVIDER_MODELS: Record<string, any[]> = {
       intelligenceLevel: 'Maximum',
     },
     {
-      id: 'gemini-3.1-pro-preview',
-      name: 'Gemini 3.1 Pro',
+      id: 'gemini-flash-latest',
+      name: 'Gemini Flash (Latest Stable)',
       provider: 'gemini',
-      description: 'Frontier reasoning and STEM model for deeply complex multi-step workflows.',
-      contextWindow: '2,000,000 tokens',
-      capabilities: ['reasoning', 'webSearch', 'codeExecution', 'vision', 'jsonMode'],
-      minPlanTier: 'tier1',
-      supportedPlans: ['tier1', 'pro', 'enterprise'],
-      isPaid: true,
-      speed: 'Balanced',
-      intelligenceLevel: 'Maximum',
+      description: 'Rolling alias pointing to the latest stable general-purpose Gemini Flash release.',
+      contextWindow: '1,000,000 tokens',
+      capabilities: ['webSearch', 'fastSpeed', 'jsonMode', 'codeExecution', 'vision'],
+      minPlanTier: 'free',
+      supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
+      speed: 'Ultra-Fast',
+      intelligenceLevel: 'Very High',
     },
   ],
   openai: [
     {
-      id: 'gpt-4o-mini',
-      name: 'GPT-4o Mini',
+      id: 'gpt-4.1-mini',
+      name: 'GPT-4.1 Mini',
       provider: 'openai',
-      description: 'Affordable, agile intelligence. Fast turnaround for standard inquiries and summaries.',
-      contextWindow: '128,000 tokens',
+      description: 'Fast, high-efficiency OpenAI model with 1M context window and strong instruction following.',
+      contextWindow: '1,000,000 tokens',
       capabilities: ['vision', 'codeExecution', 'jsonMode', 'fastSpeed'],
       minPlanTier: 'free',
       supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
       recommended: true,
       speed: 'Ultra-Fast',
-      intelligenceLevel: 'High',
+      intelligenceLevel: 'Very High',
+    },
+    {
+      id: 'gpt-4.1',
+      name: 'GPT-4.1',
+      provider: 'openai',
+      description: 'OpenAI flagship 1M-context coding and general intelligence model.',
+      contextWindow: '1,000,000 tokens',
+      capabilities: ['codeExecution', 'vision', 'jsonMode', 'fastSpeed'],
+      minPlanTier: 'tier1',
+      supportedPlans: ['tier1', 'pro', 'enterprise'],
+      speed: 'Fast',
+      intelligenceLevel: 'Maximum',
+    },
+    {
+      id: 'o4-mini',
+      name: 'OpenAI o4-mini',
+      provider: 'openai',
+      description: 'Fast, cost-efficient reasoning model optimized for math, coding, and visual problem solving.',
+      contextWindow: '200,000 tokens',
+      capabilities: ['reasoning', 'codeExecution', 'vision', 'fastSpeed'],
+      minPlanTier: 'tier1',
+      supportedPlans: ['tier1', 'pro', 'enterprise'],
+      recommended: true,
+      speed: 'Fast',
+      intelligenceLevel: 'Maximum',
+    },
+    {
+      id: 'o3',
+      name: 'OpenAI o3',
+      provider: 'openai',
+      description: 'Frontier reasoning model for complex multi-step STEM, coding, and analytical synthesis.',
+      contextWindow: '200,000 tokens',
+      capabilities: ['reasoning', 'codeExecution', 'vision'],
+      minPlanTier: 'pro',
+      supportedPlans: ['pro', 'enterprise'],
+      speed: 'Deep-Reasoning',
+      intelligenceLevel: 'Maximum',
     },
     {
       id: 'gpt-4o',
       name: 'GPT-4o (Omni)',
       provider: 'openai',
-      description: 'OpenAI flagship multimodal intelligence. Strongest general capability and vision.',
+      description: 'Multimodal OpenAI model with strong general capability and vision.',
       contextWindow: '128,000 tokens',
       capabilities: ['webSearch', 'codeExecution', 'vision', 'jsonMode', 'fastSpeed'],
       minPlanTier: 'tier1',
@@ -119,31 +183,56 @@ const PROVIDER_MODELS: Record<string, any[]> = {
       intelligenceLevel: 'Maximum',
     },
     {
-      id: 'o3-mini',
-      name: 'OpenAI o3-mini',
+      id: 'gpt-4o-mini',
+      name: 'GPT-4o Mini',
       provider: 'openai',
-      description: 'Fast, high-efficiency STEM and coding reasoning model with adjustable thinking.',
+      description: 'Lightweight, fast turnaround model for everyday chat and summaries.',
+      contextWindow: '128,000 tokens',
+      capabilities: ['vision', 'codeExecution', 'jsonMode', 'fastSpeed'],
+      minPlanTier: 'free',
+      supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
+      speed: 'Ultra-Fast',
+      intelligenceLevel: 'High',
+    },
+  ],
+  anthropic: [
+    {
+      id: 'claude-sonnet-4-20250514',
+      name: 'Claude Sonnet 4',
+      provider: 'anthropic',
+      description: 'Anthropic Claude 4 Sonnet balancing frontier coding, reasoning, and responsive speed.',
       contextWindow: '200,000 tokens',
-      capabilities: ['reasoning', 'codeExecution', 'fastSpeed'],
+      capabilities: ['reasoning', 'codeExecution', 'vision', 'jsonMode'],
       minPlanTier: 'tier1',
       supportedPlans: ['tier1', 'pro', 'enterprise'],
-      speed: 'Balanced',
-      intelligenceLevel: 'Very High',
+      recommended: true,
+      speed: 'Fast',
+      intelligenceLevel: 'Maximum',
     },
     {
-      id: 'o1',
-      name: 'OpenAI o1',
-      provider: 'openai',
-      description: 'Deep reasoning model designed to think thoroughly before answering complex questions.',
+      id: 'claude-opus-4-20250514',
+      name: 'Claude Opus 4',
+      provider: 'anthropic',
+      description: 'Anthropic flagship deep-reasoning model for sustained complex coding and research.',
       contextWindow: '200,000 tokens',
-      capabilities: ['reasoning', 'codeExecution', 'vision'],
+      capabilities: ['reasoning', 'codeExecution', 'vision', 'jsonMode'],
       minPlanTier: 'pro',
       supportedPlans: ['pro', 'enterprise'],
       speed: 'Deep-Reasoning',
       intelligenceLevel: 'Maximum',
     },
-  ],
-  anthropic: [
+    {
+      id: 'claude-3-7-sonnet-20250219',
+      name: 'Claude 3.7 Sonnet',
+      provider: 'anthropic',
+      description: 'Anthropic hybrid reasoning model combining instant response with extended thinking.',
+      contextWindow: '200,000 tokens',
+      capabilities: ['reasoning', 'codeExecution', 'vision', 'jsonMode'],
+      minPlanTier: 'tier1',
+      supportedPlans: ['tier1', 'pro', 'enterprise'],
+      speed: 'Balanced',
+      intelligenceLevel: 'Maximum',
+    },
     {
       id: 'claude-3-5-haiku-20241022',
       name: 'Claude 3.5 Haiku',
@@ -153,33 +242,8 @@ const PROVIDER_MODELS: Record<string, any[]> = {
       capabilities: ['fastSpeed', 'jsonMode', 'codeExecution'],
       minPlanTier: 'free',
       supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
-      recommended: true,
       speed: 'Ultra-Fast',
       intelligenceLevel: 'High',
-    },
-    {
-      id: 'claude-3-7-sonnet-20250219',
-      name: 'Claude 3.7 Sonnet',
-      provider: 'anthropic',
-      description: 'Anthropic hybrid reasoning model. Combines instant response with extended thinking.',
-      contextWindow: '200,000 tokens',
-      capabilities: ['reasoning', 'codeExecution', 'vision', 'jsonMode'],
-      minPlanTier: 'tier1',
-      supportedPlans: ['tier1', 'pro', 'enterprise'],
-      speed: 'Balanced',
-      intelligenceLevel: 'Maximum',
-    },
-    {
-      id: 'claude-3-5-sonnet-20241022',
-      name: 'Claude 3.5 Sonnet',
-      provider: 'anthropic',
-      description: 'Superb coding capabilities, nuanced literary tone, and complex architectural analysis.',
-      contextWindow: '200,000 tokens',
-      capabilities: ['codeExecution', 'vision', 'jsonMode'],
-      minPlanTier: 'tier1',
-      supportedPlans: ['tier1', 'pro', 'enterprise'],
-      speed: 'Fast',
-      intelligenceLevel: 'Maximum',
     },
   ],
   groq: [
@@ -226,7 +290,7 @@ const PROVIDER_MODELS: Record<string, any[]> = {
       id: 'deepseek-chat',
       name: 'DeepSeek V3 (Chat)',
       provider: 'deepseek',
-      description: 'State-of-the-art 671B parameter MoE architecture with incredible coding and writing.',
+      description: 'State-of-the-art MoE architecture with strong coding, math, and general chat.',
       contextWindow: '64,000 tokens',
       capabilities: ['codeExecution', 'jsonMode', 'fastSpeed'],
       minPlanTier: 'free',
@@ -239,7 +303,7 @@ const PROVIDER_MODELS: Record<string, any[]> = {
       id: 'deepseek-reasoner',
       name: 'DeepSeek R1 (Reasoner)',
       provider: 'deepseek',
-      description: 'Groundbreaking reinforcement-learning reasoning model with transparent chain-of-thought.',
+      description: 'Reinforcement-learning reasoning model with transparent chain-of-thought traces.',
       contextWindow: '64,000 tokens',
       capabilities: ['reasoning', 'codeExecution'],
       minPlanTier: 'free',
@@ -251,9 +315,9 @@ const PROVIDER_MODELS: Record<string, any[]> = {
   mistral: [
     {
       id: 'mistral-large-latest',
-      name: 'Mistral Large 2',
+      name: 'Mistral Large (Latest)',
       provider: 'mistral',
-      description: 'Mistral top-tier frontier model with 128k context, strong multilingual skills & coding.',
+      description: 'Mistral rolling frontier model alias with 128k context, multilingual skills & coding.',
       contextWindow: '128,000 tokens',
       capabilities: ['codeExecution', 'jsonMode'],
       minPlanTier: 'free',
@@ -263,10 +327,22 @@ const PROVIDER_MODELS: Record<string, any[]> = {
       intelligenceLevel: 'Very High',
     },
     {
-      id: 'codestral-latest',
-      name: 'Codestral 25.01',
+      id: 'mistral-medium-latest',
+      name: 'Mistral Medium (Latest)',
       provider: 'mistral',
-      description: 'Purpose-built for coding tasks, fill-in-the-middle, tests, and debugging in 80+ languages.',
+      description: 'Latest balanced Mistral frontier model optimized for speed and precision.',
+      contextWindow: '128,000 tokens',
+      capabilities: ['codeExecution', 'vision', 'jsonMode'],
+      minPlanTier: 'free',
+      supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
+      speed: 'Fast',
+      intelligenceLevel: 'Very High',
+    },
+    {
+      id: 'codestral-latest',
+      name: 'Codestral (Latest)',
+      provider: 'mistral',
+      description: 'Purpose-built for coding tasks, tests, and debugging in 80+ languages.',
       contextWindow: '256,000 tokens',
       capabilities: ['codeExecution', 'fastSpeed'],
       minPlanTier: 'free',
@@ -277,28 +353,28 @@ const PROVIDER_MODELS: Record<string, any[]> = {
   ],
   openrouter: [
     {
-      id: 'meta-llama/llama-3.3-70b-instruct',
-      name: 'Llama 3.3 70B Instruct',
+      id: 'anthropic/claude-sonnet-4',
+      name: 'Claude Sonnet 4 (via OpenRouter)',
       provider: 'openrouter',
-      description: 'Meta open model routed through top tier inference providers.',
-      contextWindow: '128,000 tokens',
-      capabilities: ['codeExecution', 'fastSpeed'],
-      minPlanTier: 'free',
-      supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
-      speed: 'Fast',
-      intelligenceLevel: 'Very High',
-    },
-    {
-      id: 'anthropic/claude-3.7-sonnet',
-      name: 'Claude 3.7 Sonnet (via OpenRouter)',
-      provider: 'openrouter',
-      description: 'Anthropic flagship through OpenRouter routing.',
+      description: 'Anthropic Claude Sonnet 4 routed via OpenRouter.',
       contextWindow: '200,000 tokens',
       capabilities: ['reasoning', 'codeExecution', 'vision'],
       minPlanTier: 'tier1',
       supportedPlans: ['tier1', 'pro', 'enterprise'],
       recommended: true,
-      speed: 'Balanced',
+      speed: 'Fast',
+      intelligenceLevel: 'Maximum',
+    },
+    {
+      id: 'openai/gpt-4.1',
+      name: 'GPT-4.1 (via OpenRouter)',
+      provider: 'openrouter',
+      description: 'OpenAI GPT-4.1 routed via OpenRouter.',
+      contextWindow: '1,000,000 tokens',
+      capabilities: ['codeExecution', 'vision'],
+      minPlanTier: 'tier1',
+      supportedPlans: ['tier1', 'pro', 'enterprise'],
+      speed: 'Fast',
       intelligenceLevel: 'Maximum',
     },
     {
@@ -319,7 +395,7 @@ const PROVIDER_MODELS: Record<string, any[]> = {
       id: 'sonar',
       name: 'Sonar',
       provider: 'perplexity',
-      description: 'Lightweight web grounded conversational search model.',
+      description: 'Lightweight web-grounded conversational search model.',
       contextWindow: '128,000 tokens',
       capabilities: ['webSearch', 'fastSpeed'],
       minPlanTier: 'free',
@@ -339,6 +415,30 @@ const PROVIDER_MODELS: Record<string, any[]> = {
       recommended: true,
       speed: 'Balanced',
       intelligenceLevel: 'Very High',
+    },
+    {
+      id: 'sonar-reasoning-pro',
+      name: 'Sonar Reasoning Pro',
+      provider: 'perplexity',
+      description: 'Live web search paired with deep step-by-step chain-of-thought reasoning.',
+      contextWindow: '128,000 tokens',
+      capabilities: ['webSearch', 'reasoning'],
+      minPlanTier: 'tier1',
+      supportedPlans: ['tier1', 'pro', 'enterprise'],
+      speed: 'Deep-Reasoning',
+      intelligenceLevel: 'Maximum',
+    },
+    {
+      id: 'sonar-deep-research',
+      name: 'Sonar Deep Research',
+      provider: 'perplexity',
+      description: 'Autonomous multi-source web research and comprehensive report synthesis.',
+      contextWindow: '128,000 tokens',
+      capabilities: ['webSearch', 'reasoning'],
+      minPlanTier: 'pro',
+      supportedPlans: ['pro', 'enterprise'],
+      speed: 'Deep-Reasoning',
+      intelligenceLevel: 'Maximum',
     },
   ],
   local: [
@@ -792,8 +892,8 @@ const serverUserAccounts = new Map<string, any>([
       lastLoginAt: Date.now(),
       apiKeys: {},
       savedModels: {
-        gemini: 'gemini-3.1-flash-lite',
-        openai: 'gpt-4o',
+        gemini: 'gemini-4-hydrogen',
+        openai: 'gpt-4.1-mini',
       },
     },
   ],
@@ -876,8 +976,9 @@ app.post('/api/auth/save-keys', (req: Request, res: Response) => {
   });
 });
 
-// Fetch Available Models
+// Fetch Available Models (always live & uncached)
 app.post('/api/models', async (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
   const { provider, apiKey, customBaseUrl, plan, onlyAvailable } = req.body;
   const trimmedKey = (apiKey || '').trim();
   const curated = (PROVIDER_MODELS[provider as keyof typeof PROVIDER_MODELS] || []).map((m) => ({ ...m }));
@@ -902,6 +1003,7 @@ app.post('/api/models', async (req: Request, res: Response) => {
     let accountModels: any[] = [];
     let accountChecked = false;
     let accountMessage = '';
+    let isLiveSyncedResult = false;
 
     if (provider === 'gemini') {
       const keysToTry = [trimmedKey, envGeminiKey].filter(Boolean);
@@ -909,52 +1011,105 @@ app.post('/api/models', async (req: Request, res: Response) => {
 
       for (const k of keysToTry) {
         try {
-          const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models?key=${k}`
-          );
-          if (response.ok) {
+          // Paginate through all pages so newer Gemini releases are never truncated
+          const allRawModels: any[] = [];
+          let pageToken = '';
+          for (let page = 0; page < 5; page++) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&key=${k}${
+              pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''
+            }`;
+            const response = await fetch(url);
+            if (!response.ok) {
+              if (response.status === 429) {
+                console.warn('[Gemini Models] API key is currently rate-limited (429), trying next key.');
+              }
+              break;
+            }
             const data = await response.json();
-            const rawModels = data.models || [];
-            accountModels = rawModels
+            if (Array.isArray(data.models)) {
+              allRawModels.push(...data.models);
+            }
+            if (!data.nextPageToken) break;
+            pageToken = data.nextPageToken;
+          }
+
+          if (allRawModels.length > 0) {
+            const seenIds = new Set<string>();
+            accountModels = allRawModels
               .filter((m: any) => {
-                if (!m.supportedGenerationMethods?.includes('generateContent')) return false;
+                const methods: string[] = m.supportedGenerationMethods || [];
+                const canGenerate =
+                  methods.includes('generateContent') ||
+                  methods.includes('predict') ||
+                  methods.includes('generateImages');
+                if (!canGenerate) return false;
                 const cleanId = m.name.replace(/^models\//, '');
+                if (seenIds.has(cleanId)) return false;
+                // Exclude deprecated legacy series
                 if (
+                  cleanId.includes('1.0') ||
                   cleanId.includes('1.5') ||
                   cleanId.includes('2.0') ||
-                  cleanId.includes('2.5') ||
-                  cleanId.includes('gemini-1.0') ||
-                  cleanId === 'gemini-pro'
+                  cleanId === 'gemini-pro' ||
+                  cleanId === 'gemini-pro-vision'
                 ) {
                   return false;
                 }
+                seenIds.add(cleanId);
                 return true;
               })
               .map((m: any) => {
                 const cleanId = m.name.replace(/^models\//, '');
                 const curatedMatch = curated.find((c) => c.id === cleanId);
                 if (curatedMatch) {
-                  return { ...curatedMatch, isAccountVerified: true };
+                  return {
+                    ...curatedMatch,
+                    description: m.description || curatedMatch.description,
+                    isAccountVerified: true,
+                    isLiveSynced: true,
+                  };
                 }
 
                 const isReasoning =
                   cleanId.includes('thinking') ||
                   cleanId.includes('flash') ||
                   cleanId.includes('pro') ||
-                  m.thinking;
-                const isVision = !cleanId.includes('tts') && !cleanId.includes('transcribe');
-                const isImage = cleanId.includes('image');
+                  cleanId.includes('gemini-4') ||
+                  cleanId.includes('gemini-3') ||
+                  Boolean(m.thinking);
+                const isImage =
+                  cleanId.includes('image') ||
+                  cleanId.includes('imagen') ||
+                  cleanId.includes('nano-banana');
+                const isVision =
+                  !cleanId.includes('tts') &&
+                  !cleanId.includes('transcribe') &&
+                  !cleanId.includes('embedding');
                 const caps: string[] = ['webSearch', 'codeExecution'];
                 if (isReasoning) caps.push('reasoning');
                 if (isVision) caps.push('vision');
                 if (isImage) caps.push('imageGeneration');
-                if (cleanId.includes('flash')) caps.push('fastSpeed');
+                if (cleanId.includes('flash') || cleanId.includes('hydrogen') || cleanId.includes('lite')) {
+                  caps.push('fastSpeed');
+                }
                 if (cleanId.includes('tts')) caps.push('tts');
                 caps.push('jsonMode');
 
-                const isPaid = isImage || cleanId.includes('pro') || cleanId.includes('veo');
-                const minPlan = isPaid ? 'tier1' : 'free';
-                const supported = isPaid ? ['tier1', 'pro', 'enterprise'] : ['free', 'tier1', 'pro', 'enterprise'];
+                const isPaid =
+                  isImage ||
+                  cleanId.includes('pro') ||
+                  cleanId.includes('neon') ||
+                  cleanId.includes('carbon') ||
+                  cleanId.includes('argon') ||
+                  cleanId.includes('veo') ||
+                  cleanId.includes('omni');
+                const minPlan = cleanId.includes('argon') ? 'pro' : isPaid ? 'tier1' : 'free';
+                const supported =
+                  minPlan === 'pro'
+                    ? ['pro', 'enterprise']
+                    : isPaid
+                    ? ['tier1', 'pro', 'enterprise']
+                    : ['free', 'tier1', 'pro', 'enterprise'];
 
                 const tokenCount = m.inputTokenLimit || 1048576;
                 const formattedTokens =
@@ -966,35 +1121,53 @@ app.post('/api/models', async (req: Request, res: Response) => {
                   id: cleanId,
                   name: m.displayName || cleanId,
                   provider: 'gemini',
-                  description: m.description || `Google Gemini model available on your account (${cleanId})`,
+                  description: m.description || `Live Google Gemini model (${cleanId})`,
                   contextWindow: formattedTokens,
                   capabilities: caps,
                   minPlanTier: minPlan,
                   supportedPlans: supported,
                   isPaid,
                   isAccountVerified: true,
-                  speed: cleanId.includes('lite')
-                    ? 'Ultra-Fast'
-                    : cleanId.includes('flash')
-                    ? 'Fast'
-                    : 'Deep-Reasoning',
-                  intelligenceLevel: cleanId.includes('pro') ? 'Maximum' : 'Very High',
-                  recommended: cleanId === 'gemini-3.1-flash-lite',
+                  isLiveSynced: true,
+                  speed:
+                    cleanId.includes('lite') || cleanId.includes('hydrogen')
+                      ? 'Ultra-Fast'
+                      : cleanId.includes('flash')
+                      ? 'Fast'
+                      : 'Deep-Reasoning',
+                  intelligenceLevel:
+                    cleanId.includes('pro') || cleanId.includes('neon') || cleanId.includes('carbon') || cleanId.includes('argon')
+                      ? 'Maximum'
+                      : 'Very High',
+                  recommended: cleanId === 'gemini-4-hydrogen' || cleanId === 'gemini-3.1-flash-lite',
                 };
               });
 
+            // Merge active curated SDK flagship models if not returned verbatim by v1beta/models
             for (const cur of curated) {
               if (!accountModels.some((m) => m.id === cur.id)) {
-                accountModels.unshift({ ...cur, isAccountVerified: true });
+                accountModels.push({ ...cur, isAccountVerified: true, isLiveSynced: true });
               }
             }
-            accountModels.sort((a, b) => (b.recommended ? 1 : 0) - (a.recommended ? 1 : 0));
+
+            // Sort newest & recommended Gemini series first (4.x -> 3.x -> 2.5 -> others)
+            const getGeminiRank = (id: string, rec?: boolean) => {
+              let score = rec ? 1000 : 0;
+              if (id.includes('gemini-4')) score += 500;
+              else if (id.includes('gemini-3.8') || id.includes('gemini-3.5')) score += 400;
+              else if (id.includes('gemini-3.1') || id.includes('gemini-3')) score += 350;
+              else if (id.includes('nano-banana')) score += 320;
+              else if (id.includes('gemini-2.5')) score += 250;
+              else if (id.includes('latest')) score += 200;
+              return score;
+            };
+            accountModels.sort((a, b) => getGeminiRank(b.id, b.recommended) - getGeminiRank(a.id, a.recommended));
+
             accountChecked = true;
-            accountMessage = `Found ${accountModels.length} models active on your Google Gemini API account.`;
+            accountMessage = `Live-synced ${accountModels.length} active models from Google Gemini API.`;
             accountDataFetched = true;
+            isLiveSyncedResult = true;
             break;
-          } else if (response.status === 429) {
-            console.warn('[Gemini Models] API key is currently rate-limited (429), trying next key or curated catalog.');
           }
         } catch (fetchErr) {
           console.warn('[Gemini Models] Fetch error:', fetchErr);
@@ -1002,12 +1175,12 @@ app.post('/api/models', async (req: Request, res: Response) => {
       }
 
       if (!accountDataFetched) {
-        // High-resilience fallback: provide verified curated catalog
-        accountModels = curated.map((m) => ({ ...m, isAccountVerified: true }));
+        accountModels = curated.map((m) => ({ ...m, isAccountVerified: true, isLiveSynced: false }));
         accountChecked = true;
-        accountMessage = keysToTry.length > 0
-          ? 'Active Google Gemini connection established (curated high-performance models loaded).'
-          : 'Enter your GEMINI API key to check models on your account.';
+        accountMessage =
+          keysToTry.length > 0
+            ? 'Active Google Gemini connection established (curated flagship models loaded).'
+            : 'Enter your GEMINI API key to live-sync models from your account.';
       }
     } else if (provider === 'openai' && trimmedKey) {
       const response = await fetch('https://api.openai.com/v1/models', {
@@ -1016,65 +1189,159 @@ app.post('/api/models', async (req: Request, res: Response) => {
       if (response.ok) {
         const data = await response.json();
         const raw = data.data || [];
-        const chatModels = raw.filter(
-          (m: any) =>
-            m.id.startsWith('gpt-') ||
-            m.id.startsWith('o1') ||
-            m.id.startsWith('o3') ||
-            m.id.startsWith('chatgpt-')
-        );
+        const excludedPatterns = [
+          'whisper',
+          'tts-',
+          'dall-e',
+          'gpt-image',
+          'sora',
+          'embedding',
+          'babbage',
+          'davinci',
+          'moderation',
+          'realtime',
+          'transcribe',
+          'audio-preview',
+          'search-api',
+        ];
+        const chatModels = raw.filter((m: any) => {
+          const id = String(m.id || '').toLowerCase();
+          if (excludedPatterns.some((pat) => id.includes(pat))) return false;
+          return (
+            id.startsWith('gpt-') ||
+            id.startsWith('o1') ||
+            id.startsWith('o3') ||
+            id.startsWith('o4') ||
+            id.startsWith('o5') ||
+            id.startsWith('chatgpt-') ||
+            id.startsWith('codex-')
+          );
+        });
         accountModels = chatModels.map((m: any) => {
-          const isReasoning = m.id.startsWith('o1') || m.id.startsWith('o3');
+          const id = String(m.id);
+          const isReasoning =
+            id.startsWith('o1') ||
+            id.startsWith('o3') ||
+            id.startsWith('o4') ||
+            id.startsWith('o5') ||
+            id.startsWith('gpt-5');
           const caps: string[] = ['codeExecution', 'jsonMode'];
           if (isReasoning) caps.push('reasoning');
-          if (m.id.includes('4o') || m.id.includes('vision') || m.id.includes('turbo')) {
+          if (
+            id.includes('4o') ||
+            id.includes('4.1') ||
+            id.includes('4.5') ||
+            id.includes('gpt-5') ||
+            id.includes('o3') ||
+            id.includes('o4') ||
+            id.includes('vision')
+          ) {
             caps.push('vision');
           }
-          if (m.id.includes('mini') || m.id.includes('turbo')) {
+          if (id.includes('mini') || id.includes('nano') || id.includes('turbo') || id.includes('4.1')) {
             caps.push('fastSpeed');
           }
+          const isPaid = !id.includes('mini') && !id.includes('nano');
+          const minPlan =
+            id === 'o3' || id.startsWith('o1-pro') || id.includes('pro')
+              ? 'pro'
+              : isPaid
+              ? 'tier1'
+              : 'free';
+
           return {
-            id: m.id,
-            name: m.id,
+            id,
+            name: id,
             provider: 'openai',
-            description: `OpenAI account model ${m.id} (owned by ${m.owned_by || 'openai'})`,
-            contextWindow: isReasoning ? '200k tokens' : '128k tokens',
+            description: `Live OpenAI account model ${id} (owned by ${m.owned_by || 'openai'})`,
+            contextWindow: id.includes('4.1') || id.includes('gpt-5') ? '1,000,000 tokens' : isReasoning ? '200k tokens' : '128k tokens',
             capabilities: caps,
+            minPlanTier: minPlan,
+            supportedPlans:
+              minPlan === 'pro'
+                ? ['pro', 'enterprise']
+                : minPlan === 'tier1'
+                ? ['tier1', 'pro', 'enterprise']
+                : ['free', 'tier1', 'pro', 'enterprise'],
+            isPaid,
             isAccountVerified: true,
-            speed: isReasoning ? 'Deep-Reasoning' : m.id.includes('mini') ? 'Ultra-Fast' : 'Fast',
-            intelligenceLevel: isReasoning || m.id === 'gpt-4o' ? 'Maximum' : 'High',
-            recommended: m.id === 'gpt-4o' || m.id === 'gpt-4o-mini',
+            isLiveSynced: true,
+            createdAt: typeof m.created === 'number' ? m.created * 1000 : undefined,
+            speed: isReasoning && !id.includes('mini') ? 'Deep-Reasoning' : id.includes('mini') || id.includes('nano') ? 'Ultra-Fast' : 'Fast',
+            intelligenceLevel: isReasoning || id.includes('4.1') || id.includes('gpt-5') || id === 'gpt-4o' ? 'Maximum' : 'High',
+            recommended: id === 'gpt-4.1-mini' || id === 'gpt-4.1' || id === 'o4-mini' || id === 'gpt-4o',
           };
         });
-        accountModels.sort((a: any, b: any) => (b.recommended ? 1 : 0) - (a.recommended ? 1 : 0));
+        // Sort newest released OpenAI models first
+        accountModels.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
         accountChecked = true;
-        accountMessage = `Found ${accountModels.length} models active on your OpenAI account.`;
+        accountMessage = `Live-synced ${accountModels.length} models from your OpenAI account.`;
+        isLiveSyncedResult = true;
       }
     } else if (provider === 'anthropic' && trimmedKey) {
-      const response = await fetch('https://api.anthropic.com/v1/models', {
-        headers: {
-          'x-api-key': trimmedKey,
-          'anthropic-version': '2023-06-01',
-        },
-      });
-      if (response.ok) {
+      const allAnthropic: any[] = [];
+      let afterId = '';
+      for (let page = 0; page < 4; page++) {
+        const url = `https://api.anthropic.com/v1/models?limit=100${
+          afterId ? `&after_id=${encodeURIComponent(afterId)}` : ''
+        }`;
+        const response = await fetch(url, {
+          headers: {
+            'x-api-key': trimmedKey,
+            'anthropic-version': '2023-06-01',
+          },
+        });
+        if (!response.ok) break;
         const data = await response.json();
-        accountModels = (data.data || []).map((m: any) => ({
-          id: m.id,
-          name: m.display_name || m.id,
-          provider: 'anthropic',
-          description: `Anthropic account model (${m.id})`,
-          contextWindow: '200k tokens',
-          capabilities: m.id.includes('3-7')
-            ? ['reasoning', 'vision', 'codeExecution', 'jsonMode']
-            : ['vision', 'codeExecution', 'jsonMode'],
-          isAccountVerified: true,
-          speed: m.id.includes('haiku') ? 'Ultra-Fast' : 'Fast',
-          intelligenceLevel: 'Maximum',
-          recommended: m.id.includes('3-7-sonnet') || m.id.includes('3-5-sonnet'),
-        }));
+        if (Array.isArray(data.data)) {
+          allAnthropic.push(...data.data);
+        }
+        if (!data.has_more || !data.last_id) break;
+        afterId = data.last_id;
+      }
+
+      if (allAnthropic.length > 0) {
+        accountModels = allAnthropic.map((m: any) => {
+          const id = String(m.id);
+          const supportsThinking =
+            id.includes('3-7') ||
+            id.includes('-4-') ||
+            id.includes('sonnet-4') ||
+            id.includes('opus-4') ||
+            id.includes('haiku-4');
+          const isOpus = id.includes('opus');
+          const isHaiku = id.includes('haiku');
+          const minPlan = isOpus ? 'pro' : isHaiku ? 'free' : 'tier1';
+
+          return {
+            id,
+            name: m.display_name || id,
+            provider: 'anthropic',
+            description: `Live Anthropic model (${id})`,
+            contextWindow: '200k tokens',
+            capabilities: supportsThinking
+              ? ['reasoning', 'vision', 'codeExecution', 'jsonMode']
+              : ['vision', 'codeExecution', 'jsonMode'],
+            minPlanTier: minPlan,
+            supportedPlans:
+              minPlan === 'pro'
+                ? ['pro', 'enterprise']
+                : minPlan === 'tier1'
+                ? ['tier1', 'pro', 'enterprise']
+                : ['free', 'tier1', 'pro', 'enterprise'],
+            isPaid: !isHaiku,
+            isAccountVerified: true,
+            isLiveSynced: true,
+            createdAt: m.created_at ? Date.parse(m.created_at) : undefined,
+            speed: isHaiku ? 'Ultra-Fast' : isOpus ? 'Deep-Reasoning' : 'Fast',
+            intelligenceLevel: isHaiku ? 'High' : 'Maximum',
+            recommended: id.includes('sonnet-4') || id.includes('3-7-sonnet'),
+          };
+        });
+        accountModels.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
         accountChecked = true;
-        accountMessage = `Found ${accountModels.length} models active on your Anthropic account.`;
+        accountMessage = `Live-synced ${accountModels.length} models from Anthropic API.`;
+        isLiveSyncedResult = true;
       }
     } else if (provider === 'groq' && trimmedKey) {
       const response = await fetch('https://api.groq.com/openai/v1/models', {
@@ -1082,27 +1349,48 @@ app.post('/api/models', async (req: Request, res: Response) => {
       });
       if (response.ok) {
         const data = await response.json();
-        accountModels = (data.data || []).map((m: any) => {
-          const isReasoning = m.id.includes('r1') || m.id.includes('reason');
-          const caps = ['codeExecution', 'fastSpeed', 'jsonMode'];
-          if (isReasoning) caps.push('reasoning');
-          return {
-            id: m.id,
-            name: m.id,
-            provider: 'groq',
-            description: `Groq LPU account model (${m.id})`,
-            contextWindow: m.context_window
-              ? `${(m.context_window / 1000).toFixed(0)}k tokens`
-              : '128k tokens',
-            capabilities: caps,
-            isAccountVerified: true,
-            speed: 'Ultra-Fast',
-            intelligenceLevel: isReasoning ? 'Maximum' : 'Very High',
-            recommended: m.id.includes('llama-3.3-70b') || m.id.includes('deepseek-r1'),
-          };
-        });
+        accountModels = (data.data || [])
+          .filter((m: any) => {
+            const id = String(m.id || '').toLowerCase();
+            return (
+              !id.includes('whisper') &&
+              !id.includes('playai-tts') &&
+              !id.includes('orpheus') &&
+              !id.includes('llama-guard') &&
+              !id.includes('prompt-guard')
+            );
+          })
+          .map((m: any) => {
+            const id = String(m.id);
+            const isReasoning = id.includes('r1') || id.includes('reason') || id.includes('qwen') || id.includes('qwq');
+            const caps = ['codeExecution', 'fastSpeed', 'jsonMode'];
+            if (isReasoning) caps.push('reasoning');
+            if (id.includes('vision') || id.includes('maverick') || id.includes('scout')) {
+              caps.push('vision');
+            }
+            return {
+              id,
+              name: id,
+              provider: 'groq',
+              description: `Live Groq LPU model (${id})`,
+              contextWindow: m.context_window
+                ? `${Math.round(m.context_window / 1000)}k tokens`
+                : '128k tokens',
+              capabilities: caps,
+              minPlanTier: 'free',
+              supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
+              isAccountVerified: true,
+              isLiveSynced: true,
+              createdAt: typeof m.created === 'number' ? m.created * 1000 : undefined,
+              speed: 'Ultra-Fast',
+              intelligenceLevel: isReasoning || id.includes('70b') ? 'Maximum' : 'Very High',
+              recommended: id.includes('llama-3.3-70b') || id.includes('deepseek-r1'),
+            };
+          });
+        accountModels.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
         accountChecked = true;
-        accountMessage = `Found ${accountModels.length} models active on your Groq account.`;
+        accountMessage = `Live-synced ${accountModels.length} active models from Groq Cloud.`;
+        isLiveSyncedResult = true;
       }
     } else if (provider === 'deepseek' && trimmedKey) {
       const response = await fetch('https://api.deepseek.com/models', {
@@ -1122,19 +1410,23 @@ app.post('/api/models', async (req: Request, res: Response) => {
           description:
             m.id === 'deepseek-reasoner'
               ? 'DeepSeek reasoning model with CoT thinking trace'
-              : 'DeepSeek frontier MoE language model',
+              : `Live DeepSeek model (${m.id})`,
           contextWindow: '64,000 tokens',
           capabilities:
             m.id === 'deepseek-reasoner'
               ? ['reasoning', 'codeExecution']
               : ['codeExecution', 'fastSpeed', 'jsonMode'],
+          minPlanTier: 'free',
+          supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
           isAccountVerified: true,
+          isLiveSynced: true,
           speed: m.id === 'deepseek-reasoner' ? 'Deep-Reasoning' : 'Fast',
           intelligenceLevel: 'Maximum',
           recommended: true,
         }));
         accountChecked = true;
-        accountMessage = `Found ${accountModels.length} models active on your DeepSeek account.`;
+        accountMessage = `Live-synced ${accountModels.length} models from DeepSeek API.`;
+        isLiveSyncedResult = true;
       }
     } else if (provider === 'mistral' && trimmedKey) {
       const response = await fetch('https://api.mistral.ai/v1/models', {
@@ -1142,48 +1434,122 @@ app.post('/api/models', async (req: Request, res: Response) => {
       });
       if (response.ok) {
         const data = await response.json();
-        accountModels = (data.data || []).map((m: any) => ({
-          id: m.id,
-          name: m.name || m.id,
-          provider: 'mistral',
-          description: m.description || `Mistral account model (${m.id})`,
-          contextWindow: m.max_context_length
-            ? `${(m.max_context_length / 1000).toFixed(0)}k tokens`
-            : '128k tokens',
-          capabilities: ['codeExecution', 'jsonMode'],
-          isAccountVerified: true,
-          speed: 'Fast',
-          intelligenceLevel: 'Very High',
-          recommended: m.id.includes('large') || m.id.includes('codestral'),
-        }));
+        const raw = data.data || [];
+        const seen = new Set<string>();
+        accountModels = raw
+          .filter((m: any) => {
+            const id = String(m.id || '');
+            if (id.includes('embed') || id.includes('moderation')) return false;
+            if (seen.has(id)) return false;
+            seen.add(id);
+            return true;
+          })
+          .map((m: any) => {
+            const id = String(m.id);
+            const caps = ['codeExecution', 'jsonMode'];
+            if (id.includes('pixtral') || id.includes('medium') || id.includes('small-25')) {
+              caps.push('vision');
+            }
+            if (id.includes('magistral')) {
+              caps.push('reasoning');
+            }
+            return {
+              id,
+              name: m.name || id,
+              provider: 'mistral',
+              description: m.description || `Live Mistral model (${id})`,
+              contextWindow: m.max_context_length
+                ? `${Math.round(m.max_context_length / 1000)}k tokens`
+                : '128k tokens',
+              capabilities: caps,
+              minPlanTier: 'free',
+              supportedPlans: ['free', 'tier1', 'pro', 'enterprise'],
+              isAccountVerified: true,
+              isLiveSynced: true,
+              createdAt: typeof m.created === 'number' ? m.created * 1000 : undefined,
+              speed: id.includes('small') || id.includes('ministral') ? 'Ultra-Fast' : 'Fast',
+              intelligenceLevel: id.includes('large') || id.includes('magistral') ? 'Maximum' : 'Very High',
+              recommended: id.includes('mistral-large-latest') || id.includes('codestral-latest'),
+            };
+          });
+        accountModels.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
         accountChecked = true;
-        accountMessage = `Found ${accountModels.length} models active on your Mistral account.`;
+        accountMessage = `Live-synced ${accountModels.length} models from Mistral AI.`;
+        isLiveSyncedResult = true;
       }
-    } else if (provider === 'openrouter' && trimmedKey) {
-      const response = await fetch('https://openrouter.ai/api/v1/models', {
-        headers: { Authorization: `Bearer ${trimmedKey}` },
-      });
+    } else if (provider === 'openrouter') {
+      // OpenRouter /api/v1/models is publicly accessible and continuously updated
+      const headers: Record<string, string> = {};
+      if (trimmedKey) headers['Authorization'] = `Bearer ${trimmedKey}`;
+      const response = await fetch('https://openrouter.ai/api/v1/models', { headers });
       if (response.ok) {
         const data = await response.json();
-        accountModels = (data.data || []).slice(0, 40).map((m: any) => ({
-          id: m.id,
-          name: m.name || m.id,
-          provider: 'openrouter',
-          description: m.description || `OpenRouter model ${m.id}`,
-          contextWindow: m.context_length
-            ? `${(m.context_length / 1000).toFixed(0)}k tokens`
-            : '128k',
-          capabilities: ['codeExecution', 'jsonMode'],
-          isAccountVerified: true,
-          speed: 'Fast',
-          intelligenceLevel: 'Very High',
-          recommended: m.id.includes('claude-3.7') || m.id.includes('gpt-4o'),
-        }));
-        accountChecked = true;
-        accountMessage = `Found ${accountModels.length} models active on OpenRouter.`;
+        const raw = Array.isArray(data.data) ? data.data : [];
+        raw.sort((a: any, b: any) => (b.created || 0) - (a.created || 0));
+
+        const flagshipIds = [
+          'anthropic/claude-sonnet-4',
+          'anthropic/claude-opus-4',
+          'openai/gpt-4.1',
+          'openai/o4-mini',
+          'google/gemini-2.5-pro',
+          'google/gemini-2.5-flash',
+          'deepseek/deepseek-r1',
+          'deepseek/deepseek-chat-v3-0324',
+          'meta-llama/llama-4-maverick',
+        ];
+        const flagships = raw.filter((m: any) => flagshipIds.some((fid) => m.id?.includes(fid)));
+        const newest = raw.filter((m: any) => !flagships.includes(m)).slice(0, 100);
+        const combined = [...flagships, ...newest].slice(0, 120);
+
+        accountModels = combined.map((m: any) => {
+          const id = String(m.id);
+          const isFree =
+            id.endsWith(':free') ||
+            (Number(m.pricing?.prompt) === 0 && Number(m.pricing?.completion) === 0);
+          const caps = ['codeExecution', 'jsonMode'];
+          if (id.includes('r1') || id.includes('o3') || id.includes('o4') || id.includes('thinking') || id.includes('sonnet-4') || id.includes('opus-4')) {
+            caps.push('reasoning');
+          }
+          if (m.architecture?.modality?.includes('image')) {
+            caps.push('vision');
+          }
+          return {
+            id,
+            name: m.name || id,
+            provider: 'openrouter',
+            description: m.description || `OpenRouter live model ${id}`,
+            contextWindow: m.context_length
+              ? `${Math.round(m.context_length / 1000)}k tokens`
+              : '128k tokens',
+            capabilities: caps,
+            minPlanTier: isFree ? 'free' : 'tier1',
+            supportedPlans: isFree ? ['free', 'tier1', 'pro', 'enterprise'] : ['tier1', 'pro', 'enterprise'],
+            isPaid: !isFree,
+            isAccountVerified: Boolean(trimmedKey),
+            isLiveSynced: true,
+            createdAt: typeof m.created === 'number' ? m.created * 1000 : undefined,
+            speed: id.includes('mini') || id.includes('flash') ? 'Ultra-Fast' : 'Fast',
+            intelligenceLevel: 'Very High',
+            recommended:
+              id.includes('claude-sonnet-4') ||
+              id.includes('gpt-4.1') ||
+              id.includes('deepseek-r1'),
+          };
+        });
+        accountChecked = Boolean(trimmedKey);
+        accountMessage = `Live-synced ${accountModels.length} latest models from OpenRouter directory.`;
+        isLiveSyncedResult = true;
       }
+    } else if (provider === 'perplexity') {
+      accountModels = curated.map((m) => ({
+        ...m,
+        isAccountVerified: Boolean(trimmedKey),
+        isLiveSynced: true,
+      }));
+      accountChecked = Boolean(trimmedKey);
+      accountMessage = `Loaded ${accountModels.length} Perplexity Sonar models.`;
     } else if (provider === 'local') {
-      // Local WebGPU models are curated in-browser; also optionally probe local Ollama if reachable on same host
       const baseUrl = (customBaseUrl || 'http://localhost:11434').replace(/\/+$/, '');
       const rootUrl = baseUrl.endsWith('/v1') ? baseUrl.slice(0, -3) : baseUrl;
       const tagsRes = await fetch(`${rootUrl}/api/tags`).catch(() => null);
@@ -1199,6 +1565,7 @@ app.post('/api/models', async (req: Request, res: Response) => {
             contextWindow: 'Local',
             capabilities: ['codeExecution'],
             isAccountVerified: true,
+            isLiveSynced: true,
             speed: 'Fast',
             intelligenceLevel: 'Very High',
             localRuntime: 'ollama',
@@ -1207,6 +1574,7 @@ app.post('/api/models', async (req: Request, res: Response) => {
         accountModels = [...ollamaModels, ...curated];
         accountChecked = ollamaModels.length > 0;
         accountMessage = `Found ${ollamaModels.length} Ollama models + ${curated.length} WebGPU browser models.`;
+        isLiveSyncedResult = ollamaModels.length > 0;
       }
     } else if (provider === 'custom') {
       const baseUrl = (customBaseUrl || 'http://localhost:11434/v1').replace(/\/+$/, '');
@@ -1226,44 +1594,50 @@ app.post('/api/models', async (req: Request, res: Response) => {
             contextWindow: 'Custom',
             capabilities: ['codeExecution'],
             isAccountVerified: true,
+            isLiveSynced: true,
+            createdAt: typeof m.created === 'number' ? m.created * 1000 : undefined,
             speed: 'Fast',
             intelligenceLevel: 'High',
             recommended: true,
           };
         });
+        accountModels.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
         accountChecked = true;
-        accountMessage = `Found ${accountModels.length} models on your custom endpoint.`;
+        accountMessage = `Live-synced ${accountModels.length} models on your custom endpoint.`;
+        isLiveSyncedResult = true;
       }
     }
 
-    if (accountChecked && accountModels.length > 0) {
+    if (accountModels.length > 0) {
       const filtered = filterByPlan(accountModels);
       return res.json({
         provider,
         models: filtered,
         totalUnfiltered: accountModels.length,
-        accountChecked: true,
+        accountChecked,
         totalAccountModels: filtered.length,
         statusMessage: accountMessage,
-        source: 'api_account',
+        source: isLiveSyncedResult ? 'api_live' : 'catalog',
+        fetchedAt: Date.now(),
       });
     }
 
-    const filteredCurated = filterByPlan(curated.map((m) => ({ ...m, isAccountVerified: false })));
+    const filteredCurated = filterByPlan(curated.map((m) => ({ ...m, isAccountVerified: false, isLiveSynced: false })));
     return res.json({
       provider,
       models: filteredCurated,
       totalUnfiltered: curated.length,
       accountChecked: false,
       totalAccountModels: 0,
-      requiresKey: !trimmedKey && provider !== 'gemini',
+      requiresKey: !trimmedKey && provider !== 'gemini' && provider !== 'openrouter',
       statusMessage: trimmedKey
-        ? `Could not reach ${provider} account API. Showing verified model catalog.`
-        : `Enter your ${provider.toUpperCase()} API key to check models on your account.`,
+        ? `Could not reach ${provider} account API. Showing curated catalog.`
+        : `Enter your ${provider.toUpperCase()} API key to live-sync models on your account.`,
       source: 'catalog',
+      fetchedAt: Date.now(),
     });
   } catch (err: any) {
-    const fallbackFiltered = filterByPlan(curated.map((m) => ({ ...m, isAccountVerified: false })));
+    const fallbackFiltered = filterByPlan(curated.map((m) => ({ ...m, isAccountVerified: false, isLiveSynced: false })));
     return res.json({
       provider,
       models: fallbackFiltered,
@@ -1272,6 +1646,7 @@ app.post('/api/models', async (req: Request, res: Response) => {
       totalAccountModels: 0,
       statusMessage: `Error checking account: ${err.message}`,
       source: 'catalog',
+      fetchedAt: Date.now(),
     });
   }
 });
@@ -1298,7 +1673,7 @@ app.post('/api/generate-image', async (req: Request, res: Response) => {
 
     // Select valid image model per SDK guidelines
     let targetModel = model || 'gemini-3.1-flash-lite-image';
-    if (!targetModel.includes('image')) {
+    if (!targetModel.includes('image') && !targetModel.includes('nano-banana')) {
       targetModel = 'gemini-3.1-flash-lite-image';
     }
 
@@ -1525,7 +1900,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
     provider = 'gemini',
     apiKey,
     customBaseUrl,
-    model = 'gemini-3.8-flash',
+    model = 'gemini-4-hydrogen',
     messages = [],
     capabilities = {},
     secretPrompt,
@@ -1777,11 +2152,28 @@ app.post('/api/chat', async (req: Request, res: Response) => {
         genConfig.systemInstruction = fullInstruction;
       }
 
-      if (typeof capabilities.temperature === 'number') {
-        genConfig.temperature = capabilities.temperature;
+      let resolvedModel = model || 'gemini-4-hydrogen';
+      if (
+        resolvedModel.includes('1.5') ||
+        resolvedModel.includes('2.0') ||
+        resolvedModel === 'gemini-pro'
+      ) {
+        resolvedModel = 'gemini-4-hydrogen';
       }
-      if (typeof capabilities.topP === 'number') {
-        genConfig.topP = capabilities.topP;
+
+      const isGemini4Series = (mId: string) =>
+        mId === 'gemini-4-hydrogen' ||
+        mId === 'gemini-4-neon' ||
+        mId === 'gemini-4-carbon' ||
+        mId === 'gemini-4-argon';
+
+      if (!isGemini4Series(resolvedModel)) {
+        if (typeof capabilities.temperature === 'number') {
+          genConfig.temperature = capabilities.temperature;
+        }
+        if (typeof capabilities.topP === 'number') {
+          genConfig.topP = capabilities.topP;
+        }
       }
 
       // Isolate search grounding configuration so it can failover independently without breaking chat sessions
@@ -1790,27 +2182,19 @@ app.post('/api/chat', async (req: Request, res: Response) => {
         genConfig.tools = [{ googleSearch: {} }];
       }
 
-      if (capabilities.reasoning && model.includes('gemini-3')) {
-        let level = ThinkingLevel.HIGH;
+      if (capabilities.reasoning && (resolvedModel.includes('gemini-3') || resolvedModel.includes('gemini-4'))) {
+        let level: ThinkingLevel = ThinkingLevel.HIGH;
         if (capabilities.thinkingLevel === 'low') level = ThinkingLevel.LOW;
-        if (capabilities.thinkingLevel === 'minimal') level = ThinkingLevel.MINIMAL;
+        if (capabilities.thinkingLevel === 'minimal') {
+          level = isGemini4Series(resolvedModel) ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL;
+        }
         genConfig.thinkingConfig = { thinkingLevel: level };
       }
 
-      let resolvedModel = model || 'gemini-3.8-flash';
-      if (
-        resolvedModel.includes('1.5') ||
-        resolvedModel.includes('2.0') ||
-        resolvedModel.includes('2.5') ||
-        resolvedModel === 'gemini-pro'
-      ) {
-        resolvedModel = 'gemini-3.8-flash';
-      }
-
       // Candidate models for graceful fallback if primary model encounters 429 quota or 503 demand
-      // Note: gemini-3.1-flash-lite has a separate, significantly higher rate quota pool
       const candidateModels = [
         resolvedModel,
+        'gemini-4-hydrogen',
         'gemini-3.1-flash-lite',
         'gemini-flash-latest',
       ].filter((m, idx, arr) => arr.indexOf(m) === idx);
@@ -1831,7 +2215,16 @@ app.post('/api/chat', async (req: Request, res: Response) => {
           const isFallbackKey = kIdx > 0;
 
           const attemptConfig = { ...genConfig };
-          if (!candidateModel.includes('gemini-3') && attemptConfig.thinkingConfig) {
+          if (isGemini4Series(candidateModel)) {
+            delete attemptConfig.temperature;
+            delete attemptConfig.topP;
+            delete attemptConfig.topK;
+            delete attemptConfig.candidateCount;
+            if (attemptConfig.thinkingConfig?.thinkingLevel === ThinkingLevel.MINIMAL) {
+              attemptConfig.thinkingConfig = { thinkingLevel: ThinkingLevel.LOW };
+            }
+          }
+          if (!candidateModel.includes('gemini-3') && !candidateModel.includes('gemini-4') && attemptConfig.thinkingConfig) {
             delete attemptConfig.thinkingConfig;
           }
 
@@ -2042,7 +2435,12 @@ app.post('/api/chat', async (req: Request, res: Response) => {
         bodyPayload.system = anthropicSystem;
       }
 
-      if (capabilities.reasoning && model.includes('3-7')) {
+      const supportsAnthropicThinking =
+        model.includes('3-7') ||
+        model.includes('sonnet-4') ||
+        model.includes('opus-4') ||
+        model.includes('-4-');
+      if (capabilities.reasoning && supportsAnthropicThinking) {
         bodyPayload.thinking = {
           type: 'enabled',
           budget_tokens: capabilities.thinkingLevel === 'high' ? 4096 : 2048,
@@ -2181,14 +2579,27 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       }
     }
 
+    const isOpenAIReasoningModel =
+      provider === 'openai' &&
+      (model.startsWith('o1') ||
+        model.startsWith('o3') ||
+        model.startsWith('o4') ||
+        model.startsWith('o5') ||
+        model.startsWith('gpt-5'));
+
     const payload: any = {
       model,
       messages: formattedMsgs,
       stream: true,
-      temperature: capabilities.temperature ?? 0.7,
-      top_p: capabilities.topP ?? 0.95,
-      max_tokens: capabilities.maxTokens ?? 4096,
     };
+
+    if (isOpenAIReasoningModel) {
+      payload.max_completion_tokens = capabilities.maxTokens ?? 4096;
+    } else {
+      payload.temperature = capabilities.temperature ?? 0.7;
+      payload.top_p = capabilities.topP ?? 0.95;
+      payload.max_tokens = capabilities.maxTokens ?? 4096;
+    }
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -2396,7 +2807,7 @@ Respond ONLY with valid JSON in this exact structure:
           setTimeout(() => reject(new Error('Evaluation timeout')), 12000)
         );
         const evalCall = ai.models.generateContent({
-          model: 'gemini-3.8-flash',
+          model: 'gemini-4-hydrogen',
           contents: evalPrompt,
           config: {
             responseMimeType: 'application/json',
@@ -2520,7 +2931,7 @@ app.post('/api/eval/ragas', async (req: Request, res: Response) => {
 
 app.post('/api/eval/batch', async (req: Request, res: Response) => {
   try {
-    const { items = [], apiKey, externalConfig, modelName = 'gemini-3.8-flash' } = req.body;
+    const { items = [], apiKey, externalConfig, modelName = 'gemini-4-hydrogen' } = req.body;
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'An array of items is required.' });
     }

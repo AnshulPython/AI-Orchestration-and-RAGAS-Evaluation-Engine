@@ -60,9 +60,9 @@ export function getUserAccounts(): UserAccount[] {
     isDefault: true,
     apiKeys: initialKeys,
     savedModels: {
-      gemini: 'gemini-3.1-flash-lite',
-      openai: 'gpt-4o',
-      anthropic: 'claude-3-7-sonnet-20250219',
+      gemini: 'gemini-4-hydrogen',
+      openai: 'gpt-4.1-mini',
+      anthropic: 'claude-sonnet-4-20250514',
     },
   };
 
@@ -198,19 +198,24 @@ export function setActiveProvider(provider: AIProviderId): void {
 export function getActiveModel(provider: AIProviderId): string {
   try {
     const stored = localStorage.getItem(`${MODEL_STORAGE_KEY}_${provider}`);
-    if (stored) return stored;
-    if (provider === 'gemini') return 'gemini-3.1-flash-lite';
-    if (provider === 'openai') return 'gpt-4o';
-    if (provider === 'anthropic') return 'claude-3-7-sonnet-20250219';
+    if (stored) {
+      if (provider === 'gemini' && stored === 'gemini-3.8-flash') {
+        return 'gemini-4-hydrogen';
+      }
+      return stored;
+    }
+    if (provider === 'gemini') return 'gemini-4-hydrogen';
+    if (provider === 'openai') return 'gpt-4.1-mini';
+    if (provider === 'anthropic') return 'claude-sonnet-4-20250514';
     if (provider === 'groq') return 'llama-3.3-70b-versatile';
     if (provider === 'deepseek') return 'deepseek-chat';
     if (provider === 'mistral') return 'mistral-large-latest';
-    if (provider === 'openrouter') return 'anthropic/claude-3.7-sonnet';
+    if (provider === 'openrouter') return 'anthropic/claude-sonnet-4';
     if (provider === 'perplexity') return 'sonar-pro';
     if (provider === 'local') return 'Qwen3-0.6B-q4f16_1-MLC';
     return 'default-custom-model';
   } catch {
-    return 'gemini-3.8-flash';
+    return 'gemini-4-hydrogen';
   }
 }
 

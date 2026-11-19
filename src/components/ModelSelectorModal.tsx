@@ -59,6 +59,8 @@ interface ModelSelectorModalProps {
   accountChecked?: boolean;
   totalAccountModels?: number;
   onPlanChanged?: (plan: ApiPlanTier) => void;
+  lastUpdated?: number | null;
+  modelsSource?: string | null;
 }
 
 export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
@@ -72,6 +74,8 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
   onRefreshAccountModels,
   isRefreshing = false,
   onPlanChanged,
+  lastUpdated,
+  modelsSource,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCap, setFilterCap] = useState<CapabilityType | 'all'>('all');
@@ -220,7 +224,7 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
               <Layers className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base font-semibold text-[#e3e3e3]">
                   Models ({currentProviderInfo.name})
                 </h2>
@@ -229,11 +233,28 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
                     {currentPlanInfo.label}
                   </span>
                 )}
+                {lastUpdated && (
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-medium border flex items-center gap-1 ${
+                      modelsSource === 'api_live'
+                        ? 'bg-[#81c995]/10 text-[#81c995] border-[#81c995]/30'
+                        : 'bg-[#282a2c] text-[#8e918f] border-[#3c4043]'
+                    }`}
+                    title={`Last synced at ${new Date(lastUpdated).toLocaleTimeString()}`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        modelsSource === 'api_live' ? 'bg-[#81c995]' : 'bg-[#8e918f]'
+                      }`}
+                    />
+                    {modelsSource === 'api_live' ? 'Live Sync' : 'Catalog'}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-[#8e918f]">
                 {isLocalProvider
                   ? 'Select a real local model to execute privately on your device GPU or local Ollama/LM Studio daemon.'
-                  : 'Select the AI model for your conversations. Filtered by your active API plan.'}
+                  : 'Always synced with provider APIs. Select a model or switch your API plan tier.'}
               </p>
             </div>
           </div>
@@ -243,13 +264,13 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
                 onClick={onRefreshAccountModels}
                 disabled={isRefreshing}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#282a2c] hover:bg-[#333538] text-xs text-[#c4c7c5] hover:text-white transition-colors cursor-pointer"
-                title="Re-check models directly on the provider API"
+                title="Re-sync latest models directly from the provider API"
               >
                 <RefreshCw
                   className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#8ab4f8]' : ''}`}
                 />
                 <span className="hidden sm:inline">
-                  {isRefreshing ? 'Checking...' : 'Refresh'}
+                  {isRefreshing ? 'Syncing...' : 'Sync Now'}
                 </span>
               </button>
             )}
@@ -524,6 +545,11 @@ export const ModelSelectorModal: React.FC<ModelSelectorModalProps> = ({
                       {model.recommended && (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#81c995]/15 text-[#81c995] border border-[#81c995]/30">
                           Recommended
+                        </span>
+                      )}
+                      {model.isLiveSynced && !model.recommended && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#8ab4f8]/10 text-[#8ab4f8] border border-[#8ab4f8]/30">
+                          Live
                         </span>
                       )}
                       {isImageModel && (
